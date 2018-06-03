@@ -232,9 +232,9 @@ public class CollabClient implements CollabInterface {
 	public void updateDoc(Operation o) {
 		try {
 			if (o instanceof InsertOperation) {
-				this.gui.getCollabModel().remoteInsert((Operation) o);
+				this.gui.getCollabModel().remoteOp((Operation) o, true);
 			} else if (o instanceof DeleteOperation) {
-				this.gui.getCollabModel().remoteDelete((Operation) o);
+				this.gui.getCollabModel().remoteOp((Operation) o, false);
 			} else if (o instanceof UpdateOperation) {
 				throw new UnsupportedOperationException();
 			} else {
