@@ -574,7 +574,7 @@ public class ClientGui extends JPanel {
         frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 
         // Add content to the window.
-        frame.add(new ClientGui("Welcome to Collab Edit!", "Client"));
+        frame.add(new ClientGui("Welcome to Collabypto!", "Client"));
 
         // Display the window.
         frame.pack();
