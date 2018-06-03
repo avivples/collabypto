@@ -3,7 +3,7 @@ package gui;
 import javax.swing.JList;
 import javax.swing.event.ListSelectionListener;
 
-import model.CollabModel;
+import server_client.CollabModel;
 import server_client.CollabInterface;
 import server_client.CollabServer;
 import controller.DocumentSelectionListener;
@@ -44,6 +44,18 @@ public class ServerGui extends ClientGui {
 	 */
 	private static final String PROMPT_FOR_SERVER = "Server for document: ";
 
+    public static void main(String[] args) {
+	    CollabServer server = new CollabServer("0.0.0.0", 4444, "server");
+	    ServerGui gui = new ServerGui(server, "server");
+        Thread thread = new Thread() {
+            @Override
+            public void run() {
+                collabServer.start();
+            }
+        };
+        thread.start();
+    }
+
 	/**
 	 * ServerGui sets up the GUI for the local client
 	 * 
@@ -56,8 +68,7 @@ public class ServerGui extends ClientGui {
 	 * @throws OperationEngineException
 	 * 
 	 */
-	public ServerGui(CollabInterface cs, String serverName)
-			throws OperationEngineException {
+	public ServerGui(CollabInterface cs, String serverName) throws OperationEngineException {
 		super(WELCOME_MESSAGE, PROMPT_FOR_SERVER + serverName);
 		collabServer = (CollabServer) cs;
 		collabModel = new CollabModel(textArea, collabServer);

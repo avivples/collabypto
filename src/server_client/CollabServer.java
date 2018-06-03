@@ -17,7 +17,6 @@ package server_client;
 
 public class CollabServer implements CollabInterface {
 
-}
     /** maximum number of clients allowed at a time */
     private static final int MAX_CLIENTS = 30;
     /** default document name */
@@ -95,6 +94,20 @@ public class CollabServer implements CollabInterface {
         // The server is viewed as the zeroth socket
         clientSockets.add(null);
         System.out.println("Server created.");
+    }
+
+    /**
+     * start up a server.
+     * by calling the connect() method.
+     * @throws OperationEngineException if the operation finds an incosistency
+     */
+    public void start() {
+        try {
+            this.serve();
+        } catch (IOException e) {
+            new ErrorDialog(e.toString());
+        }
+
     }
 
 
