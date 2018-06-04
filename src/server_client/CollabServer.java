@@ -1,5 +1,26 @@
 package server_client;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Set;
+
+import javax.swing.JFrame;
+import javax.swing.text.BadLocationException;
+
+import gui.ErrorDialog;
+import gui.ServerGui;
+import document.DeleteOperation;
+import document.InsertOperation;
+import document.Operation;
+import document.OperationEngineException;
+import document.Pair;
+
 /**
  *
  * Creates a server that will store the main copy of each document. It will block
@@ -17,40 +38,69 @@ package server_client;
 
 public class CollabServer implements CollabInterface {
 
-    /** maximum number of clients allowed at a time */
+    /**
+     * maximum number of clients allowed at a time
+     */
     private static final int MAX_CLIENTS = 30;
-    /** default document name */
+    /**
+     * default document name
+     */
     private static final String DEFAULT_DOC_NAME = "default";
-    /** lock object*/
+    /**
+     * lock object
+     */
     Object lock = new Object();
-    /** server socket that accepts client connections*/
+    /**
+     * server socket that accepts client connections
+     */
     private ServerSocket serverSocket;
-    /** number of clients actively connected*/
+    /**
+     * number of clients actively connected
+     */
     private int users = 0;
-    /** port number of the server*/
+    /**
+     * port number of the server
+     */
     private int port = 0;
-    /** IP address of the server */
+    /**
+     * IP address of the server
+     */
     private String ip = "";
-    /** name of the server */
+    /**
+     * name of the server
+     */
     private String serverName;
-    /** JFrame used by the server GUI for display */
+    /**
+     * JFrame used by the server GUI for display
+     */
     private JFrame frame;
-    /** GUI object for the server */
+    /**
+     * GUI object for the server
+     */
     private ServerGui displayGui;
-    /** order of the operations */
+    /**
+     * order of the operations
+     */
     private int order;
-    /** Data structure to keep track of clients */
+    /**
+     * Data structure to keep track of clients
+     */
     private final ArrayList<Pair<Socket, Boolean>> clientSockets = new ArrayList<Pair<Socket, Boolean>>();
 
-    /** A hash of socket to its associated input/output streams. We want to use these
+    /**
+     * A hash of socket to its associated input/output streams. We want to use these
      * two streams each time we need to communicate between a particular client and the server
      */
     private final HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>> socketStreams = new HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>>();
 
-    /** List of all users */
+    /**
+     * List of all users
+     */
     private final ArrayList<String> usernames = new ArrayList<String>();
 
-    /** List of all documents */
+    /**
+     * List of all documents
+     */
     private final HashMap<String, ServerGui> documents = new HashMap<String, ServerGui>();
 
 
@@ -59,11 +109,8 @@ public class CollabServer implements CollabInterface {
      * server socket, and generate a central GUI.
      * List of documents and socket names are also initialized
      *
-     * @param port
-     *            - targeted port number
-     * @param IP
-     *            - targeted IP address
-     *
+     * @param port - targeted port number
+     * @param IP   - targeted IP address
      */
     public CollabServer(String IP, int port, String name) {
         // Sets server info
@@ -99,6 +146,7 @@ public class CollabServer implements CollabInterface {
     /**
      * start up a server.
      * by calling the connect() method.
+     *
      * @throws OperationEngineException if the operation finds an incosistency
      */
     public void start() {
@@ -117,9 +165,8 @@ public class CollabServer implements CollabInterface {
      * Never returns unless an exception is thrown. Creates a new thread for
      * every new connection.
      *
-     * @throws IOException
-     *             if the main server socket is broken (IOExceptions from
-     *             individual clients do *not* terminate serve()).
+     * @throws IOException if the main server socket is broken (IOExceptions from
+     *                     individual clients do *not* terminate serve()).
      */
     public void serve() throws IOException {
         frame = new JFrame("Collab Edit Demo");
@@ -169,10 +216,8 @@ public class CollabServer implements CollabInterface {
      * closing all the appropriate sockets and streams. This is where various
      * information passing will be done between the client and server.
      *
-     * @param socket
-     *            socket via which the client is connected
-     * @throws IOException
-     *             if connection has an error or terminates unexpectedly
+     * @param socket socket via which the client is connected
+     * @throws IOException if connection has an error or terminates unexpectedly
      */
     public void handleConnection(Socket socket) throws IOException {
         int clientID = -1;
@@ -253,17 +298,13 @@ public class CollabServer implements CollabInterface {
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
             }
-        }
-        catch (ClassNotFoundException e) {
+        } catch (ClassNotFoundException e) {
             e.printStackTrace();
-        }
-        catch (OperationEngineException e) {
+        } catch (OperationEngineException e) {
             e.printStackTrace();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return;
-        }
-        finally {
+        } finally {
             // Clean up, close connections
             if (clientID == -1) {
                 return;
@@ -295,15 +336,11 @@ public class CollabServer implements CollabInterface {
      * should be an operation that was performed on the client. The server
      * should then update its corresponding document and notify all clients
      *
-     * @param input
-     *            - object sent from the client to parse
-     * @param documentID
-     *            - the document that the client is editing
-     * @param clientID
-     *            - the identification of the client sending the object
-     * @throws IOException
-     *             - caused if the operation object is corrupt, or if the socket
-     *             connection breaks
+     * @param input      - object sent from the client to parse
+     * @param documentID - the document that the client is editing
+     * @param clientID   - the identification of the client sending the object
+     * @throws IOException - caused if the operation object is corrupt, or if the socket
+     *                     connection breaks
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
         if (input instanceof Operation) {
@@ -319,9 +356,8 @@ public class CollabServer implements CollabInterface {
      * Updates the copy of the document using operational transform through a
      * call to the CollabModel's remoteInsert/remoteDelete
      *
-     * @param o
-     *            - the operation that was received from the client to apply to
-     *            the model
+     * @param o - the operation that was received from the client to apply to
+     *          the model
      */
     @Override
     public void updateDoc(Operation o) {
@@ -398,8 +434,7 @@ public class CollabServer implements CollabInterface {
      * Sends a Pair of users and documents to all active clients to update the
      * right pane. It is called each time a new client joins or leaves
      *
-     * @throws IOException
-     *             - if the socket connection is corrupted
+     * @throws IOException - if the socket connection is corrupted
      */
     @SuppressWarnings("unchecked")
     public void updateUsers() throws IOException {
@@ -441,8 +476,7 @@ public class CollabServer implements CollabInterface {
      * Switches between documents to be displayed on the server. This happens
      * when a user clicks on a document name on the server GUI.
      *
-     * @param document
-     *            - the document name to be switched
+     * @param document - the document name to be switched
      */
     public synchronized void switchScreen(String document) {
         // TODO: remove
@@ -464,7 +498,6 @@ public class CollabServer implements CollabInterface {
     }
 
 
-
     /**
      * @return the ID of the server, which is always 0
      */
@@ -475,53 +508,71 @@ public class CollabServer implements CollabInterface {
 
     /**
      * Get the list of documents currently store in the model
+     *
      * @return the list of documents
      */
     public Set<String> getDocumentsName() {
         return documents.keySet();
     }
 
-    /** @return ip address of server */
+    /**
+     * @return ip address of server
+     */
     public String getIP() {
         return this.ip;
     }
 
-    /** @return port number of server */
+    /**
+     * @return port number of server
+     */
     public int getPort() {
         return this.port;
     }
 
-    /** @return username of server */
+    /**
+     * @return username of server
+     */
     public String getUsername() {
         return this.serverName;
     }
 
-    /** @return HashMap of documents to ServerGuis */
+    /**
+     * @return HashMap of documents to ServerGuis
+     */
     public HashMap<String, ServerGui> getDocuments() {
         return this.documents;
     }
 
-    /** @return serverSockets */
+    /**
+     * @return serverSockets
+     */
     public ServerSocket getServerSocket() {
         return this.serverSocket;
     }
 
-    /** @return order of server */
+    /**
+     * @return order of server
+     */
     public int getOrder() {
         return this.order;
     }
 
-    /** @return number of users */
+    /**
+     * @return number of users
+     */
     public int getNumOfUsers() {
         return this.users;
     }
 
-    /** set number of users
+    /**
+     * set number of users
+     *
      * @param number of users
      */
     public void setNumOfUsers(int users) {
         this.users = users;
     }
+}
 
 
 

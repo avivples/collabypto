@@ -1,6 +1,6 @@
 package gui;
 
-import javax.swing.JList;
+import javax.swing.*;
 import javax.swing.event.ListSelectionListener;
 
 import server_client.CollabModel;
@@ -44,13 +44,13 @@ public class ServerGui extends ClientGui {
 	 */
 	private static final String PROMPT_FOR_SERVER = "Server for document: ";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws OperationEngineException {
 	    CollabServer server = new CollabServer("0.0.0.0", 4444, "server");
 	    ServerGui gui = new ServerGui(server, "server");
         Thread thread = new Thread() {
             @Override
             public void run() {
-                collabServer.start();
+                gui.collabServer.start();
             }
         };
         thread.start();
@@ -85,7 +85,6 @@ public class ServerGui extends ClientGui {
 	/**
 	 * @return the default sizeID of the server is 0
 	 */
-	@Override
 	public int getSiteID() {
 		return 0;
 	}
@@ -127,6 +126,18 @@ public class ServerGui extends ClientGui {
 	 */
 	public JList getListOfDocuments() {
 		return documentList;
+	}
+
+
+
+	// THIS WAS ADDED JUST SO WE CAN TEST @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+	/**
+	 * Used by the server to make it uneditable
+	 *
+	 * @return the textArea (where the document is being edited).
+	 */
+	public JTextPane getTextArea() {
+		return this.textArea;
 	}
 
 }

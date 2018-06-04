@@ -7,13 +7,8 @@ import javax.swing.AbstractAction;
 import javax.swing.undo.CannotUndoException;
 import javax.swing.undo.UndoManager;
 
-import ui.ErrorDialog;
+import gui.ErrorDialog;
 
-/* Test
- * This action is already tested in Client and Server Gui by clicking the undo button
- * It will throw cannotUndoException if there is nothing to undo but this won't interrupt
- * the editing process
- * See client Gui for more detail*/
 /**
  * This class will make the undo action when the user performs the click using
  * UndoManager Thread-safe argument: This is thread-safe as indicated in the

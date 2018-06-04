@@ -5,12 +5,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 
-/*Test Strategy:
- * The caret shows at the bottom of the documents of client and server
- * This is tested by asking different users to type at the same time and check the 
- * position show at every character. This is tested in both clientGui and ServerGui
- * 
- * */
 @SuppressWarnings("serial")
 /**
  * This class will listen to the carret changes in the documents and shows it 

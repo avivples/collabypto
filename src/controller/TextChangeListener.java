@@ -6,14 +6,9 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.SimpleAttributeSet;
 
-import model.CollabModel;
-import ui.ClientGui;
+import server_client.CollabModel;
+import gui.ClientGui;
 import document.OperationEngineException;
-
-/*This is tested in Client Gui and Server GUI
- * by typing in the documents and observing the changes appropriately
- * This is most appropriate to test in the Gui to observer if any insertion, deletion
- * or Attribute change will get reflecte in the command line with the correct change.*/
 
 /**
  * This class is the controller listener for changes in the main document, then
@@ -25,7 +20,7 @@ import document.OperationEngineException;
  */
 public class TextChangeListener implements DocumentListener {
     @SuppressWarnings("unused")
-	/** clientGui or serverGUI */	
+	/** clientGui or serverGUI */
     private final ClientGui gui;
 	/** the underlying model */
 	private final CollabModel model;
@@ -86,7 +81,7 @@ public class TextChangeListener implements DocumentListener {
 
 	/**
 	 * This will get the delete Event from the model and get the text that
-	 * change and delete it to the appropriate place in the documents and send
+	 * change and delete it from the appropriate place in the documents and send
 	 * out notification to other clients if they exit.
 	 * 
 	 * @param e
@@ -96,8 +91,7 @@ public class TextChangeListener implements DocumentListener {
 	public void removeUpdate(DocumentEvent e) {
 		int pos = e.getOffset();
 
-		int change = 0;
-		change = e.getLength();
+		int change = e.getLength();
 
 		if (!model.remote) {
 			AttributeSet normal = new SimpleAttributeSet();

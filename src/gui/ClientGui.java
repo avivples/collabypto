@@ -40,7 +40,7 @@ import javax.swing.text.StyledDocument;
 import javax.swing.text.StyledEditorKit;
 import javax.swing.undo.UndoManager;
 
-import model.CollabModel;
+import server_client.CollabModel;
 import server_client.CollabClient;
 import server_client.CollabInterface;
 import controller.CaretListenerLabel;

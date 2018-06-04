@@ -1,7 +1,7 @@
 package server_client;
 
 import document.*;
-import model.CollabModel;
+import server_client.CollabModel;
 import gui.ClientGui;
 import gui.DocumentSelectionPage;
 import gui.ErrorDialog;
