@@ -1,7 +1,6 @@
 package server_client;
 
 import document.*;
-import server_client.CollabModel;
 import gui.ClientGui;
 import gui.DocumentSelectionPage;
 import gui.ErrorDialog;
@@ -158,6 +157,8 @@ public class CollabClient implements CollabInterface {
 			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
+		} catch (OperationEngineException e) {
+			e.printStackTrace();
 		} finally {
 		    // Close connection
 		    s.close();
@@ -177,7 +178,7 @@ public class CollabClient implements CollabInterface {
 	 * the operation engine
 	 */
 	@SuppressWarnings("unchecked")
-    public void parseInput(Object o) throws IOException {
+    public void parseInput(Object o) throws IOException, OperationEngineException {
 	    if (o instanceof Pair) {
 	    	Pair p = (Pair) o;
 	    	Object ciphertext = p.first;
@@ -186,6 +187,8 @@ public class CollabClient implements CollabInterface {
 			Object plaintext = decrypt(ciphertext);
 			if (plaintext instanceof Operation) {
 				Operation op = (Operation) plaintext;
+				// this is the operation that was originally sent by this client, so we don't update
+				if (getID() == op.getSiteId()) return;
 				// We received an operation from the server. Update the local document
 				op.setOrder((Integer) p.second);
 				updateDoc(op);
@@ -218,23 +221,39 @@ public class CollabClient implements CollabInterface {
             label = this.name + " is editing document: " + this.document;
 
         } else if (o instanceof String) {
-            // The server just sent the initial string of the document
-            // Start up the GUI with this string
-            try {
-                this.gui = new ClientGui((String) o, this, label);
-            } catch (OperationEngineException e) {
-                e.printStackTrace();
-            }
-            this.gui.setModelKey(document);
 
-            JFrame frame = new JFrame("Collab Edit Demo");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            // Add content to the JFrame window.
-            frame.add(this.gui);
-            // Display the window.
-            frame.pack();
-            frame.setVisible(true);
-        } else if (o instanceof ClientState) {
+	    	if (o.equals("stop")) {
+				gui.newUserStop();
+			} else if (o.equals("continue")) {
+				gui.newUserCont();
+			} else if (o.equals("give")) {
+	    		// TODO: encrypt and change this so we send the object we always speak of
+				transmit(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())));
+			} else {
+	    		// TODO: this will be changed accordingly initially client will not just get a string
+				// TODO: we'll create a new object that holds text, contextvector, list of operations
+				// The server just sent the initial string of the document
+				// Start up the GUI with this string
+				try {
+					this.gui = new ClientGui((String) o, this, label);
+				} catch (OperationEngineException e) {
+					e.printStackTrace();
+				}
+				this.gui.setModelKey(document);
+
+				JFrame frame = new JFrame("Collab Edit Demo");
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				// Add content to the JFrame window.
+				frame.add(this.gui);
+				// Display the window.
+				frame.pack();
+				frame.setVisible(true);
+			}
+        }
+        else if (o instanceof DocumentInstance) {
+
+		}
+        else if (o instanceof ClientState) {
 			// Updates the ContextVector of the GUI with the one sent by the server
 			CollabModel collab = this.gui.getCollabModel();
 			collab.setCV((ClientState) o);
@@ -249,9 +268,13 @@ public class CollabClient implements CollabInterface {
         }
 	}
 
-	private Object decrypt(Object cipherText) {
-		//TODO
-		return cipherText;
+	private Object decrypt(Object ciphertext) {
+		// TODO
+		return ciphertext;
+	}
+
+	private Object encrypt(Object plaintext) {
+		return plaintext;
 	}
 
 	/**
@@ -292,8 +315,7 @@ public class CollabClient implements CollabInterface {
 	 * @param o the operation to transmit to server
 	 * @throws IOException if the OutputStream is corrupted or broken
 	 */
-	@Override
-	public void transmit(Operation o) throws IOException {
+	public void transmit(Object o) throws IOException {
 		if (out == null)
 			throw new RuntimeException("Socket not initialized.");
 		out.writeObject(o);

@@ -13,13 +13,9 @@ import java.util.Set;
 import javax.swing.JFrame;
 import javax.swing.text.BadLocationException;
 
+import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
-import document.DeleteOperation;
-import document.InsertOperation;
-import document.Operation;
-import document.OperationEngineException;
-import document.Pair;
 
 /**
  *
@@ -99,6 +95,7 @@ public class CollabServer implements CollabInterface {
     private final ArrayList<String> usernames = new ArrayList<String>();
 
 
+
     // TODO: Change documents to be a map from ID to string + history
     /**
      * List of all documents
@@ -107,6 +104,8 @@ public class CollabServer implements CollabInterface {
 
     // TODO: Put history for every doc. For only one for testing
     private ArrayList<Object> history = new ArrayList<>();
+
+    private Boolean userJoinedLock = false;  //tries to lock other threads from doing things while handling a new user joining
 
 
     /**
@@ -248,6 +247,7 @@ public class CollabServer implements CollabInterface {
             }
 
             synchronized (lock) {
+                // TODO: make user create object of new doc NOT SERVER
                 // If document does not exist, create it
                 documentID = (String) input;
                 if (!documents.containsKey(documentID)) {
@@ -270,23 +270,59 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
 
-            // Sends to client the initial String in the document
-            // TODO: Send encrypted doc
-            out.writeObject(documents.get(documentID).getText());
-            out.flush();
+            synchronized (lock) {
 
-            // Sends to client the ContextVector of the document model
-            try {
-                out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
-            } catch (OperationEngineException e) {
-                e.printStackTrace();
+                if (users > 1) {
+                    try {
+                        userJoinedLock = true;
+                        transmitAllButOne("stop", socket);
+                        Socket s = getActiveSocket(socket);
+                        ObjectOutputStream out_user = socketStreams.get(s).second;
+                        out_user.writeObject("give");
+                        out_user.flush();
+                        ObjectInputStream in_user = socketStreams.get(s).first;
+                        while(in_user.available() == 0);
+                        System.err.println(in_user.available());
+                        Object docInstance = in_user.readObject();
+                        String doc = ((DocumentInstance)docInstance).document;
+                        Object cV = ((DocumentInstance)docInstance).contextVector;
+                        out.writeObject(doc);
+//                        out.writeObject(documents.get(documentID).getText());
+                        out.flush();
+                        out.writeObject(cV);
+//                        out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
+                        out.flush();
+                        transmitAllButOne("continue", socket);
+                        userJoinedLock = false;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    // TODO: Change this to return just the encrypted object of a document
+                    // Sends to client the initial String in the document
+                    // TODO: Send encrypted doc
+                    out.writeObject(documents.get(documentID).getText());
+                    out.flush();
+
+                    // Sends to client the ContextVector of the document model
+                    try {
+                        out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
+                    } catch (OperationEngineException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+
             }
+
             // TODO: need to not use ServerGui, instead use an object that holds the text and context vector
 //            out.writeObject(THIS OBJECT WE SPEAK OF);
 //            out.flush();
 
-            out.writeObject(history);
-            out.flush();
+
+            // This was used when we had the list of operations
+//            out.writeObject(history);
+//            out.flush();
 
 
             // Receives username of client. Updates users.
@@ -306,6 +342,7 @@ public class CollabServer implements CollabInterface {
             // the client from now on.
             input = in.readObject();
             while (input != null) {
+                if(userJoinedLock) continue;
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
             }
@@ -314,6 +351,7 @@ public class CollabServer implements CollabInterface {
         } catch (OperationEngineException e) {
             e.printStackTrace();
         } catch (Exception e) {
+            e.printStackTrace();
             return;
         } finally {
             // Clean up, close connections
@@ -356,10 +394,19 @@ public class CollabServer implements CollabInterface {
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
         if (input instanceof Operation) {
             // send update to all other clients
-            transmit((Operation) input); // also mutates the input
+            // Increment the order so the Operation Engine can determine
+            // the relative position of all the operations
+            Pair<Object, Integer> delivery;
+            synchronized (lock) {
+                // TODO: REMOVE THIS LINE
+                //history.add(o);
+                delivery = new Pair<>(input, order);
+                order++;
+            }
+            transmit(delivery); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
-        } else
-            throw new RuntimeException("Unrecognized object type");
+        } //else
+            //throw new RuntimeException("Unrecognized object type");
     }
 
 
@@ -415,19 +462,9 @@ public class CollabServer implements CollabInterface {
      * @throws IOException if the input/output stream is corrupt
      */
     @Override
-    public void transmit(Operation o) throws IOException {
+    public void transmit(Object o) throws IOException {
         // TODO: change the operation to an object that will be encrypted
         ObjectOutputStream out = null;
-        // Increment the order so the Operation Engine can determine
-        // the relative position of all the operations
-        Pair<Object, Integer> delivery;
-        synchronized (lock) {
-            // TODO: REMOVE THIS LINE. THIS WAS ONLY ADDED BACK SO SERVER UPDATES FOR NOW
-            //o.setOrder(order);
-            history.add(o);
-            delivery = new Pair<>(o, order);
-            order++;
-        }
 
         // send operation to each one of the clients
         for (int i = 1; i < clientSockets.size(); i++) {
@@ -435,15 +472,47 @@ public class CollabServer implements CollabInterface {
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
-            // Connection is already closed, or this is the operation that was
-            // originally sent by that client. So we don't send.
-            if (!activeSocket || i == o.getSiteId()) continue;
+            // Connection is already closed
+            if (!activeSocket) continue;
 
             // Otherwise we send the operation
             out = socketStreams.get(currentSocket).second;
-            out.writeObject(delivery);
+            out.writeObject(o);
             out.flush();
         }
+    }
+
+    public void transmitAllButOne(Object o, Socket s) throws IOException {
+        // TODO: change the operation to an object that will be encrypted
+        ObjectOutputStream out = null;
+
+        // send operation to each one of the clients
+        for (int i = 1; i < clientSockets.size(); i++) {
+            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Socket currentSocket = p.first;
+            Boolean activeSocket = p.second;
+
+            // Connection is already closed
+            if (!activeSocket || currentSocket == s) continue;
+
+            // Otherwise we send the operation
+            out = socketStreams.get(currentSocket).second;
+            out.writeObject(o);
+            out.flush();
+        }
+    }
+
+    private Socket getActiveSocket(Socket s) {
+        for (int i = 1; i < clientSockets.size(); i++) {
+            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Socket currentSocket = p.first;
+            Boolean activeSocket = p.second;
+
+            // Connection is not closed
+            if (activeSocket && s != currentSocket) return currentSocket;
+        }
+        System.err.println("FUCK");
+        return null;
     }
 
     /**

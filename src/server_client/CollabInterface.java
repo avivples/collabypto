@@ -34,7 +34,7 @@ public interface CollabInterface {
      * @param op
      * @throws IOException 
      */
-    public void transmit(Operation op) throws IOException;
+    public void transmit(Object op) throws IOException;
 
     /**
      * Updates the copy of the document using operational transform
