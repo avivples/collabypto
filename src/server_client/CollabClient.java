@@ -178,10 +178,37 @@ public class CollabClient implements CollabInterface {
 	 */
 	@SuppressWarnings("unchecked")
     public void parseInput(Object o) throws IOException {
-	    if (o instanceof Operation) {
-	        // We received an operation from the server. Update the local document
-            updateDoc((Operation) o);
-        } else if (o instanceof Integer) {
+	    if (o instanceof Pair) {
+	    	Pair p = (Pair) o;
+	    	Object ciphertext = p.first;
+			// TODO: Decrypt "first"
+			// We'll change the temp in the if to the decrypted variable
+			Object plaintext = decrypt(ciphertext);
+			if (plaintext instanceof Operation) {
+				Operation op = (Operation) plaintext;
+				// We received an operation from the server. Update the local document
+				op.setOrder((Integer) p.second);
+				updateDoc(op);
+			}
+			if (plaintext instanceof ArrayList) {
+				// Updates list of current users and documents
+				ArrayList<String> users = (ArrayList<String>) plaintext;
+				ArrayList<String> documents = (ArrayList<String>) p.second;
+				this.gui.updateUsers(users.toArray());
+				this.gui.updateDocumentsList(documents.toArray());
+			}
+		// if a new user, get the doc in server and the history of operations
+        } else if (o instanceof ArrayList) {
+	    	ArrayList history = (ArrayList) o;
+			for (int i = 0; i < history.size(); i++) {
+				// TODO: Decrypt op
+				Operation op = (Operation) decrypt(history.get(i));
+				op.setOrder(i);
+				updateDoc(op);
+			}
+		}
+        // TODO: Decrypt o
+        else if (o instanceof Integer) {
             // The server is sending the unique client identifiers
             this.siteID = ((Integer) o).intValue();
             if (this.name.equals("Anonymous"))
@@ -208,18 +235,23 @@ public class CollabClient implements CollabInterface {
             frame.pack();
             frame.setVisible(true);
         } else if (o instanceof ClientState) {
-            // Updates the ContextVector of the GUI with the one sent by the server
-            CollabModel collab = this.gui.getCollabModel();
-            collab.setCV((ClientState) o);
-        } else if (o instanceof Pair<?, ?>) {
-            // Updates list of current users and documetns
-            ArrayList<String> users = ((Pair<ArrayList<String>, ArrayList<String>>) o).first;
-            ArrayList<String> documents = ((Pair<ArrayList<String>, ArrayList<String>>) o).second;
-            this.gui.updateUsers(users.toArray());
-            this.gui.updateDocumentsList(documents.toArray());
-        } else {
+			// Updates the ContextVector of the GUI with the one sent by the server
+			CollabModel collab = this.gui.getCollabModel();
+			collab.setCV((ClientState) o);
+//        } else if (o instanceof Pair<?, ?>) {
+//            // Updates list of current users and documents
+//            ArrayList<String> users = ((Pair<ArrayList<String>, ArrayList<String>>) o).first;
+//            ArrayList<String> documents = ((Pair<ArrayList<String>, ArrayList<String>>) o).second;
+//            this.gui.updateUsers(users.toArray());
+//            this.gui.updateDocumentsList(documents.toArray());
+		} else {
             throw new RuntimeException("Unrecognized object type received by client");
         }
+	}
+
+	private Object decrypt(Object cipherText) {
+		//TODO
+		return cipherText;
 	}
 
 	/**
@@ -257,7 +289,7 @@ public class CollabClient implements CollabInterface {
 
 	/**
 	 * Transmits local changes to the server via an operatoin
-	 * @param the operation to transmit to server
+	 * @param o the operation to transmit to server
 	 * @throws IOException if the OutputStream is corrupted or broken
 	 */
 	@Override
@@ -270,7 +302,7 @@ public class CollabClient implements CollabInterface {
 
 	/**
 	 * Used by the document selector popup to set the
-	 * @param new name of the document
+	 * @param text new name of the document
 	 */
 	public void setDocument(String text) {
 		document = text;

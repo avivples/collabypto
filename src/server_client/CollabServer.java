@@ -98,10 +98,15 @@ public class CollabServer implements CollabInterface {
      */
     private final ArrayList<String> usernames = new ArrayList<String>();
 
+
+    // TODO: Change documents to be a map from ID to string + history
     /**
      * List of all documents
      */
     private final HashMap<String, ServerGui> documents = new HashMap<String, ServerGui>();
+
+    // TODO: Put history for every doc. For only one for testing
+    private ArrayList<Object> history = new ArrayList<>();
 
 
     /**
@@ -266,6 +271,7 @@ public class CollabServer implements CollabInterface {
             out.flush();
 
             // Sends to client the initial String in the document
+            // TODO: Send encrypted doc
             out.writeObject(documents.get(documentID).getText());
             out.flush();
 
@@ -275,6 +281,11 @@ public class CollabServer implements CollabInterface {
             } catch (OperationEngineException e) {
                 e.printStackTrace();
             }
+            // TODO: need to not use ServerGui, instead use an object that holds the text and context vector
+//            out.writeObject(THIS OBJECT WE SPEAK OF);
+//            out.flush();
+
+            out.writeObject(history);
             out.flush();
 
 
@@ -346,7 +357,7 @@ public class CollabServer implements CollabInterface {
         if (input instanceof Operation) {
             // send update to all other clients
             transmit((Operation) input); // also mutates the input
-            updateDoc((Operation) input);      // TODO: remove this
+            //updateDoc((Operation) input);      // TODO: remove this
         } else
             throw new RuntimeException("Unrecognized object type");
     }
@@ -405,11 +416,16 @@ public class CollabServer implements CollabInterface {
      */
     @Override
     public void transmit(Operation o) throws IOException {
+        // TODO: change the operation to an object that will be encrypted
         ObjectOutputStream out = null;
         // Increment the order so the Operation Engine can determine
         // the relative position of all the operations
+        Pair<Object, Integer> delivery;
         synchronized (lock) {
-            o.setOrder(order);
+            // TODO: REMOVE THIS LINE. THIS WAS ONLY ADDED BACK SO SERVER UPDATES FOR NOW
+            //o.setOrder(order);
+            history.add(o);
+            delivery = new Pair<>(o, order);
             order++;
         }
 
@@ -425,7 +441,7 @@ public class CollabServer implements CollabInterface {
 
             // Otherwise we send the operation
             out = socketStreams.get(currentSocket).second;
-            out.writeObject(o);
+            out.writeObject(delivery);
             out.flush();
         }
     }
@@ -567,7 +583,7 @@ public class CollabServer implements CollabInterface {
     /**
      * set number of users
      *
-     * @param number of users
+     * @param users number of users
      */
     public void setNumOfUsers(int users) {
         this.users = users;
