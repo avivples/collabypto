@@ -158,6 +158,8 @@ public class CollabClient implements CollabInterface {
 			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
+		} catch (OperationEngineException e) {
+			e.printStackTrace();
 		} finally {
 		    // Close connection
 		    s.close();
@@ -177,7 +179,7 @@ public class CollabClient implements CollabInterface {
 	 * the operation engine
 	 */
 	@SuppressWarnings("unchecked")
-    public void parseInput(Object o) throws IOException {
+    public void parseInput(Object o) throws IOException, OperationEngineException {
 	    if (o instanceof Pair) {
 	    	Pair p = (Pair) o;
 	    	Object ciphertext = p.first;
@@ -186,6 +188,7 @@ public class CollabClient implements CollabInterface {
 			Object plaintext = decrypt(ciphertext);
 			if (plaintext instanceof Operation) {
 				Operation op = (Operation) plaintext;
+				if (getID() == op.getSiteId()) return;
 				// We received an operation from the server. Update the local document
 				op.setOrder((Integer) p.second);
 				updateDoc(op);
@@ -198,8 +201,32 @@ public class CollabClient implements CollabInterface {
 				this.gui.updateDocumentsList(documents.toArray());
 			}
 		// if a new user, get the doc in server and the history of operations
-        } else if (o instanceof ArrayList) {
-	    	ArrayList history = (ArrayList) o;
+
+        // TODO: Decrypt o
+		} else if (o instanceof DocumentInstance) {
+			// The server just sent the initial string of the document
+			// Start up the GUI with this string
+			String text = ((DocumentInstance) o).document;
+			try {
+				this.gui = new ClientGui(text, this, label);
+			} catch (OperationEngineException e) {
+				e.printStackTrace();
+			}
+			this.gui.setModelKey(document);
+
+			JFrame frame = new JFrame("Collab Edit Demo");
+			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			// Add content to the JFrame window.
+			frame.add(this.gui);
+			// Display the window.
+			frame.pack();
+			frame.setVisible(true);
+
+			// Updates the ContextVector of the GUI with the one sent by the server
+			ClientState cV = ((DocumentInstance) o).contextVector;
+			gui.getCollabModel().setCV(cV);
+		} else if (o instanceof ArrayList) {
+			ArrayList history = (ArrayList) o;
 			for (int i = 0; i < history.size(); i++) {
 				// TODO: Decrypt op
 				Operation op = (Operation) decrypt(history.get(i));
@@ -207,7 +234,6 @@ public class CollabClient implements CollabInterface {
 				updateDoc(op);
 			}
 		}
-        // TODO: Decrypt o
         else if (o instanceof Integer) {
             // The server is sending the unique client identifiers
             this.siteID = ((Integer) o).intValue();
@@ -218,22 +244,28 @@ public class CollabClient implements CollabInterface {
             label = this.name + " is editing document: " + this.document;
 
         } else if (o instanceof String) {
+		 	if (o.equals("give")) {
+				// TODO: encrypt and change this so we send the object we always speak of
+				transmit(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())));
+			}
             // The server just sent the initial string of the document
             // Start up the GUI with this string
-            try {
-                this.gui = new ClientGui((String) o, this, label);
-            } catch (OperationEngineException e) {
-                e.printStackTrace();
-            }
-            this.gui.setModelKey(document);
+			else {
+				try {
+					this.gui = new ClientGui((String) o, this, label);
+				} catch (OperationEngineException e) {
+					e.printStackTrace();
+				}
+				this.gui.setModelKey(document);
 
-            JFrame frame = new JFrame("Collab Edit Demo");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            // Add content to the JFrame window.
-            frame.add(this.gui);
-            // Display the window.
-            frame.pack();
-            frame.setVisible(true);
+				JFrame frame = new JFrame("Collab Edit Demo");
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				// Add content to the JFrame window.
+				frame.add(this.gui);
+				// Display the window.
+				frame.pack();
+				frame.setVisible(true);
+			}
         } else if (o instanceof ClientState) {
 			// Updates the ContextVector of the GUI with the one sent by the server
 			CollabModel collab = this.gui.getCollabModel();
@@ -250,8 +282,13 @@ public class CollabClient implements CollabInterface {
 	}
 
 	private Object decrypt(Object cipherText) {
-		//TODO
+		// TODO
 		return cipherText;
+	}
+
+	private Object encrypt(Object plaintext) {
+		// TODO
+		return plaintext;
 	}
 
 	/**
@@ -293,7 +330,7 @@ public class CollabClient implements CollabInterface {
 	 * @throws IOException if the OutputStream is corrupted or broken
 	 */
 	@Override
-	public void transmit(Operation o) throws IOException {
+	public void transmit(Object o) throws IOException {
 		if (out == null)
 			throw new RuntimeException("Socket not initialized.");
 		out.writeObject(o);

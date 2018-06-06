@@ -13,13 +13,9 @@ import java.util.Set;
 import javax.swing.JFrame;
 import javax.swing.text.BadLocationException;
 
+import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
-import document.DeleteOperation;
-import document.InsertOperation;
-import document.Operation;
-import document.OperationEngineException;
-import document.Pair;
 
 /**
  *
@@ -99,14 +95,16 @@ public class CollabServer implements CollabInterface {
     private final ArrayList<String> usernames = new ArrayList<String>();
 
 
-    // TODO: Change documents to be a map from ID to string + history
+    // TODO: Change documents to be a map from ID to string + history. REMOVE THIS
     /**
      * List of all documents
      */
     private final HashMap<String, ServerGui> documents = new HashMap<String, ServerGui>();
 
-    // TODO: Put history for every doc. For only one for testing
+    // TODO: Put history and documentInstance for every doc. For only one for testing
     private ArrayList<Object> history = new ArrayList<>();
+    private DocumentInstance documentInstance;
+
 
 
     /**
@@ -134,6 +132,9 @@ public class CollabServer implements CollabInterface {
         try {
             documents.put(DEFAULT_DOC_NAME,
                     new ServerGui(this, this.serverName));
+            // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
+            documentInstance = new DocumentInstance(documents.get(DEFAULT_DOC_NAME).getText(),
+                    documents.get(DEFAULT_DOC_NAME).getCollabModel().copyOfCV());
         } catch (OperationEngineException e) {
             e.printStackTrace();
         }
@@ -270,17 +271,21 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
 
-            // Sends to client the initial String in the document
-            // TODO: Send encrypted doc
-            out.writeObject(documents.get(documentID).getText());
+            // TODO: change this when each doc has its own documentInstance
+            out.writeObject(documentInstance);
             out.flush();
 
+            // Sends to client the initial String in the document
+            // TODO: Send encrypted doc
+//            out.writeObject(documents.get(documentID).getText());
+//            out.flush();
+
             // Sends to client the ContextVector of the document model
-            try {
-                out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
-            } catch (OperationEngineException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
+//            } catch (OperationEngineException e) {
+//                e.printStackTrace();
+//            }
             // TODO: need to not use ServerGui, instead use an object that holds the text and context vector
 //            out.writeObject(THIS OBJECT WE SPEAK OF);
 //            out.flush();
@@ -306,6 +311,16 @@ public class CollabServer implements CollabInterface {
             // the client from now on.
             input = in.readObject();
             while (input != null) {
+                if (history.size() > 100) {
+                    synchronized (lock) {
+                        if (history.size() > 100) {
+                            out.writeObject("give");
+                            out.flush();
+                            documentInstance = (DocumentInstance) in.readObject();
+                            history.clear();
+                        }
+                    }
+                }
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
             }
@@ -415,7 +430,7 @@ public class CollabServer implements CollabInterface {
      * @throws IOException if the input/output stream is corrupt
      */
     @Override
-    public void transmit(Operation o) throws IOException {
+    public void transmit(Object o) throws IOException {
         // TODO: change the operation to an object that will be encrypted
         ObjectOutputStream out = null;
         // Increment the order so the Operation Engine can determine
@@ -437,7 +452,7 @@ public class CollabServer implements CollabInterface {
 
             // Connection is already closed, or this is the operation that was
             // originally sent by that client. So we don't send.
-            if (!activeSocket || i == o.getSiteId()) continue;
+            if (!activeSocket) continue;
 
             // Otherwise we send the operation
             out = socketStreams.get(currentSocket).second;
