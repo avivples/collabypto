@@ -318,14 +318,17 @@ public class CollabServer implements CollabInterface {
                             out.writeObject("give");
                             out.flush();
                         }
-//                        while (!(input instanceof Pair)){
-//
-//                        }
+                        while (!(input instanceof Pair) && input != null){
+                            parseInput(input, documentID, clientID);
+                            input = in.readObject();
+                        }
+                        documentInstance = (DocumentInstance) ((Pair) input).first;
+                        history.clear();
+                        input = in.readObject();
                     }
 //                }
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
-
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
@@ -374,14 +377,15 @@ public class CollabServer implements CollabInterface {
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
         // TODO: remove casting when we encrypt
+        System.err.println(input.getClass());
         if (input instanceof Pair) {
             documentInstance = (DocumentInstance) ((Pair) input).first;
+            history.clear();
         } else if (input instanceof Operation) {
             // send update to all other clients
             transmit((Operation) input); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
         } else {
-            System.err.println(input.getClass());
             throw new RuntimeException("Unrecognized object type");
         }
     }
