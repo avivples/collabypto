@@ -206,7 +206,8 @@ public class CollabClient implements CollabInterface {
 		} else if (o instanceof DocumentInstance) {
 			// The server just sent the initial string of the document
 			// Start up the GUI with this string
-			String text = ((DocumentInstance) o).document;
+			DocumentInstance documentInstance = (DocumentInstance) o;
+			String text = documentInstance.document;
 			try {
 				this.gui = new ClientGui(text, this, label);
 			} catch (OperationEngineException e) {
@@ -223,7 +224,7 @@ public class CollabClient implements CollabInterface {
 			frame.setVisible(true);
 
 			// Updates the ContextVector of the GUI with the one sent by the server
-			ClientState cV = ((DocumentInstance) o).contextVector;
+			ClientState cV = documentInstance.contextVector;
 			gui.getCollabModel().setCV(cV);
 		} else if (o instanceof ArrayList) {
 			ArrayList history = (ArrayList) o;
@@ -246,7 +247,11 @@ public class CollabClient implements CollabInterface {
         } else if (o instanceof String) {
 		 	if (o.equals("give")) {
 				// TODO: encrypt and change this so we send the object we always speak of
-				transmit(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())));
+				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
+			} else if (o.equals("stop")) {
+				gui.newUser(false);
+			} else if (o.equals("continue")) {
+				gui.newUser(true);
 			}
             // The server just sent the initial string of the document
             // Start up the GUI with this string

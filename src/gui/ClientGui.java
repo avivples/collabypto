@@ -158,6 +158,9 @@ public class ClientGui extends JPanel {
      * toggle Underline Button to underline text
      */
     protected JToggleButton underlineButton;
+
+    protected JButton undoButton;
+    protected JButton redoButton;
     /**
      * make copy of document
      */
@@ -309,11 +312,11 @@ public class ClientGui extends JPanel {
         });
 
         ImageIcon undo = new ImageIcon("raw/undo.png");
-        JButton undoButton = new JButton(undo);
+        undoButton = new JButton(undo);
 
         ImageIcon redo = new ImageIcon("raw/redo.png");
 
-        JButton redoButton = new JButton(redo);
+        redoButton = new JButton(redo);
         JMenuBar toolBar = new JMenuBar();
 
         // add all button to toolBar
@@ -436,7 +439,7 @@ public class ClientGui extends JPanel {
      * people in the chat room, it will be replaced by by this new user lists
      * Modifies listModel
      *
-     * @param objects
+     * @param documents
      *            String of users' name
      *
      */
@@ -590,4 +593,14 @@ public class ClientGui extends JPanel {
         this.collabModel.setKey(str);
     }
 
+    // true - let client edit
+    // false - stop client from editing
+    public void newUser(boolean cont) {
+        textArea.setEditable(cont);
+        copyButton.setEnabled(cont);
+        cutButton.setEnabled(cont);
+        pasteButton.setEnabled(cont);
+        undoButton.setEnabled(cont);
+        redoButton.setEnabled(cont);
+    }
 }

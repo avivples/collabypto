@@ -1,5 +1,6 @@
 package server_client;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -311,24 +312,27 @@ public class CollabServer implements CollabInterface {
             // the client from now on.
             input = in.readObject();
             while (input != null) {
-                if (history.size() > 100) {
+//                if (history.size() > 100) {
                     synchronized (lock) {
-                        if (history.size() > 100) {
+                        if (history.size() > 10) {
                             out.writeObject("give");
                             out.flush();
-                            documentInstance = (DocumentInstance) in.readObject();
-                            history.clear();
                         }
+//                        while (!(input instanceof Pair)){
+//
+//                        }
                     }
-                }
+//                }
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
+
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } catch (OperationEngineException e) {
             e.printStackTrace();
         } catch (Exception e) {
+            e.printStackTrace();
             return;
         } finally {
             // Clean up, close connections
@@ -369,12 +373,17 @@ public class CollabServer implements CollabInterface {
      *                     connection breaks
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
-        if (input instanceof Operation) {
+        // TODO: remove casting when we encrypt
+        if (input instanceof Pair) {
+            documentInstance = (DocumentInstance) ((Pair) input).first;
+        } else if (input instanceof Operation) {
             // send update to all other clients
             transmit((Operation) input); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
-        } else
+        } else {
+            System.err.println(input.getClass());
             throw new RuntimeException("Unrecognized object type");
+        }
     }
 
 
