@@ -349,17 +349,23 @@ public class CollabClient implements CollabInterface {
 
 	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
 		System.err.println("Starting");
-		StringBuilder doc = new StringBuilder(text);
-		Operation[] operations = (Operation[]) history.toArray();
+		StringBuilder doc = new StringBuilder();
 		try {
-			for (int i = 0; i < operations.length; i++) {
-				Operation op = operations[i];
-				op.setOrder(i);
-				op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
-				if (op instanceof InsertOperation) {
-					doc.insert(op.getPosition(), op.getValue());
-				} else if (op instanceof DeleteOperation) {
-					doc.delete(op.getPosition(), op.getPosition() + op.getValue().length());
+			doc.append(text);
+//			Operation[] operations = history.toArray(new Operation[history.size()]);
+
+			for (int i = 0; i < history.size(); i++) {
+					Operation op = history.get(i);
+					op.setOrder(i);
+				if (op.getKey().equals(document)) {
+					System.err.println(op.getValue());
+//					op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
+					System.err.println("plz");
+					if (op instanceof InsertOperation) {
+						doc.insert(op.getPosition(), op.getValue());
+					} else if (op instanceof DeleteOperation) {
+						doc.delete(op.getPosition(), op.getPosition() + op.getValue().length());
+					}
 				}
 			}
 		} catch (Exception e) {
