@@ -4,6 +4,7 @@ import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 
 import javax.swing.AbstractAction;
+import javax.swing.undo.CannotRedoException;
 import javax.swing.undo.CannotUndoException;
 import javax.swing.undo.UndoManager;
 
@@ -39,8 +40,8 @@ public class RedoAction extends AbstractAction {
 	public void actionPerformed(ActionEvent evt) {
 		try {
 			manager.redo();
-		} catch (CannotUndoException e) {
-			new ErrorDialog("Nothing to redo man");
+		} catch (CannotRedoException e) {
+			new ErrorDialog("Nothing to redo");
 			Toolkit.getDefaultToolkit().beep();
 		}
 

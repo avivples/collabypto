@@ -192,72 +192,21 @@ public class CollabClient implements CollabInterface {
 				// We received an operation from the server. Update the local document
 				op.setOrder((Integer) p.second);
 				updateDoc(op);
-			}
-			if (plaintext instanceof ArrayList) {
+			} else if (plaintext instanceof ArrayList) {
 				// Updates list of current users and documents
 				ArrayList<String> users = (ArrayList<String>) plaintext;
 				ArrayList<String> documents = (ArrayList<String>) p.second;
 				this.gui.updateUsers(users.toArray());
 				this.gui.updateDocumentsList(documents.toArray());
-			}
-		// if a new user, get the doc in server and the history of operations
-
-        // TODO: Decrypt o
-		} else if (o instanceof DocumentInstance) {
-			// The server just sent the initial string of the document
-			// Start up the GUI with this string
-			DocumentInstance documentInstance = (DocumentInstance) o;
-			String text = documentInstance.document;
-			try {
-				this.gui = new ClientGui(text, this, label);
-			} catch (OperationEngineException e) {
-				e.printStackTrace();
-			}
-			this.gui.setModelKey(document);
-
-			JFrame frame = new JFrame("Collab Edit Demo");
-			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			// Add content to the JFrame window.
-			frame.add(this.gui);
-			// Display the window.
-			frame.pack();
-			frame.setVisible(true);
-
-			// Updates the ContextVector of the GUI with the one sent by the server
-			ClientState cV = documentInstance.contextVector;
-			gui.getCollabModel().setCV(cV);
-		} else if (o instanceof ArrayList) {
-			ArrayList history = (ArrayList) o;
-			for (int i = 0; i < history.size(); i++) {
-				// TODO: Decrypt op
-				Operation op = (Operation) decrypt(history.get(i));
-				op.setOrder(i);
-				updateDoc(op);
-			}
-		}
-        else if (o instanceof Integer) {
-            // The server is sending the unique client identifiers
-            this.siteID = ((Integer) o).intValue();
-            if (this.name.equals("Anonymous"))
-                this.name += "" + this.siteID;
-            out.writeObject(this.name);
-            out.flush();
-            label = this.name + " is editing document: " + this.document;
-
-        } else if (o instanceof String) {
-		 	if (o.equals("give")) {
-				// TODO: encrypt and change this so we send the object we always speak of
-				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
-			} else if (o.equals("stop")) {
-				gui.newUser(false);
-			} else if (o.equals("continue")) {
-				gui.newUser(true);
-			}
-            // The server just sent the initial string of the document
-            // Start up the GUI with this string
-			else {
+			} else if (plaintext instanceof DocumentInstance) {
+				DocumentInstance documentInstance = (DocumentInstance) plaintext;
+				String text = documentInstance.document;
+				ArrayList history = (ArrayList) decrypt(p.second);
+				if (history.size() > 0) {
+					text = updateFromHistory(history, text);
+				}
 				try {
-					this.gui = new ClientGui((String) o, this, label);
+					this.gui = new ClientGui(text, this, label);
 				} catch (OperationEngineException e) {
 					e.printStackTrace();
 				}
@@ -270,11 +219,87 @@ public class CollabClient implements CollabInterface {
 				// Display the window.
 				frame.pack();
 				frame.setVisible(true);
+
+				// Updates the ContextVector of the GUI with the one sent by the server
+				ClientState cV = documentInstance.contextVector;
+				gui.getCollabModel().setCV(cV);
 			}
-        } else if (o instanceof ClientState) {
-			// Updates the ContextVector of the GUI with the one sent by the server
-			CollabModel collab = this.gui.getCollabModel();
-			collab.setCV((ClientState) o);
+		// if a new user, get the doc in server and the history of operations
+
+        // TODO: Decrypt o
+//		} else if (o instanceof DocumentInstance) {
+//			// The server just sent the initial string of the document
+//			// Start up the GUI with this string
+//			DocumentInstance documentInstance = (DocumentInstance) o;
+//			String text = documentInstance.document;
+//			try {
+//				this.gui = new ClientGui(text, this, label);
+//			} catch (OperationEngineException e) {
+//				e.printStackTrace();
+//			}
+//			this.gui.setModelKey(document);
+//
+//			JFrame frame = new JFrame("Collab Edit Demo");
+//			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//			// Add content to the JFrame window.
+//			frame.add(this.gui);
+//			// Display the window.
+//			frame.pack();
+//			frame.setVisible(true);
+//
+//			// Updates the ContextVector of the GUI with the one sent by the server
+//			ClientState cV = documentInstance.contextVector;
+//			gui.getCollabModel().setCV(cV);
+		}
+// 		else if (o instanceof ArrayList) {
+//			ArrayList history = (ArrayList) o;
+//			for (int i = 0; i < history.size(); i++) {
+//				// TODO: Decrypt op
+//				Operation op = (Operation) decrypt(history.get(i));
+//				op.setOrder(i);
+//				updateDoc(op);
+//			}
+//		}
+        else if (o instanceof Integer) {
+            // The server is sending the unique client identifiers
+            this.siteID = ((Integer) o).intValue();
+            if (this.name.equals("Anonymous"))
+                this.name += "" + this.siteID;
+            out.writeObject(this.name);
+            out.flush();
+            label = this.name + " is editing document: " + this.document;
+
+//        } else if (o instanceof String) {
+//		 	if (o.equals("give")) {
+//				// TODO: encrypt and change this so we send the object we always speak of
+//				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
+//			} else if (o.equals("stop")) {
+//				gui.newUser(false);
+//			} else if (o.equals("continue")) {
+//				gui.newUser(true);
+//			}
+            // The server just sent the initial string of the document
+            // Start up the GUI with this string
+//			else {
+//				try {
+//					this.gui = new ClientGui((String) o, this, label);
+//				} catch (OperationEngineException e) {
+//					e.printStackTrace();
+//				}
+//				this.gui.setModelKey(document);
+//
+//				JFrame frame = new JFrame("Collab Edit Demo");
+//				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//				// Add content to the JFrame window.
+//				frame.add(this.gui);
+//				// Display the window.
+//				frame.pack();
+//				frame.setVisible(true);
+//			}
+//        } else if (o instanceof ClientState) {
+//			// Updates the ContextVector of the GUI with the one sent by the server
+//			CollabModel collab = this.gui.getCollabModel();
+//			collab.setCV((ClientState) o);
 //        } else if (o instanceof Pair<?, ?>) {
 //            // Updates list of current users and documents
 //            ArrayList<String> users = ((Pair<ArrayList<String>, ArrayList<String>>) o).first;
@@ -305,6 +330,7 @@ public class CollabClient implements CollabInterface {
 	@Override
 	public void updateDoc(Operation o) {
 		try {
+			if (getID() == o.getSiteId()) return;
 			if (o instanceof InsertOperation) {
 				this.gui.getCollabModel().remoteOp((Operation) o, true);
 			} else if (o instanceof DeleteOperation) {
@@ -319,6 +345,28 @@ public class CollabClient implements CollabInterface {
 		} catch (BadLocationException e) {
 			new ErrorDialog(e.toString());
 		}
+	}
+
+	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
+		System.err.println("Starting");
+		StringBuilder doc = new StringBuilder(text);
+		Operation[] operations = (Operation[]) history.toArray();
+		try {
+			for (int i = 0; i < operations.length; i++) {
+				Operation op = operations[i];
+				op.setOrder(i);
+				op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
+				if (op instanceof InsertOperation) {
+					doc.insert(op.getPosition(), op.getValue());
+				} else if (op instanceof DeleteOperation) {
+					doc.delete(op.getPosition(), op.getPosition() + op.getValue().length());
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		System.err.println("End");
+		return doc.toString();
 	}
 
 	/**

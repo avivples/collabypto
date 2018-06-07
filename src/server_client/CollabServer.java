@@ -273,7 +273,7 @@ public class CollabServer implements CollabInterface {
             out.flush();
 
             // TODO: change this when each doc has its own documentInstance
-            out.writeObject(documentInstance);
+            out.writeObject(new Pair(documentInstance, history));
             out.flush();
 
             // Sends to client the initial String in the document
@@ -291,8 +291,8 @@ public class CollabServer implements CollabInterface {
 //            out.writeObject(THIS OBJECT WE SPEAK OF);
 //            out.flush();
 
-            out.writeObject(history);
-            out.flush();
+//            out.writeObject(history);
+//            out.flush();
 
 
             // Receives username of client. Updates users.
@@ -312,21 +312,6 @@ public class CollabServer implements CollabInterface {
             // the client from now on.
             input = in.readObject();
             while (input != null) {
-//                if (history.size() > 100) {
-                    synchronized (lock) {
-                        if (history.size() > 10) {
-                            out.writeObject("give");
-                            out.flush();
-                        }
-                        while (!(input instanceof Pair) && input != null){
-                            parseInput(input, documentID, clientID);
-                            input = in.readObject();
-                        }
-                        documentInstance = (DocumentInstance) ((Pair) input).first;
-                        history.clear();
-                        input = in.readObject();
-                    }
-//                }
                 parseInput(input, documentID, clientID);
                 input = in.readObject();
             }
@@ -377,11 +362,11 @@ public class CollabServer implements CollabInterface {
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
         // TODO: remove casting when we encrypt
-        System.err.println(input.getClass());
-        if (input instanceof Pair) {
-            documentInstance = (DocumentInstance) ((Pair) input).first;
-            history.clear();
-        } else if (input instanceof Operation) {
+//        System.err.println(input.getClass());
+//        if (input instanceof Pair) {
+//            documentInstance = (DocumentInstance) ((Pair) input).first;
+//            history.clear();
+        if (input instanceof Operation) {
             // send update to all other clients
             transmit((Operation) input); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
