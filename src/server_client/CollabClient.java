@@ -348,8 +348,8 @@ public class CollabClient implements CollabInterface {
 	}
 
 	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
-		System.err.println("Starting");
 		StringBuilder doc = new StringBuilder();
+		System.err.println(history.size());
 		try {
 			doc.append(text);
 //			Operation[] operations = history.toArray(new Operation[history.size()]);
@@ -358,9 +358,7 @@ public class CollabClient implements CollabInterface {
 					Operation op = history.get(i);
 					op.setOrder(i);
 				if (op.getKey().equals(document)) {
-					System.err.println(op.getValue());
 //					op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
-					System.err.println("plz");
 					if (op instanceof InsertOperation) {
 						doc.insert(op.getPosition(), op.getValue());
 					} else if (op instanceof DeleteOperation) {
@@ -371,7 +369,6 @@ public class CollabClient implements CollabInterface {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		System.err.println("End");
 		return doc.toString();
 	}
 
