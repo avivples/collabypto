@@ -106,7 +106,7 @@ public class CollabServer implements CollabInterface {
     private ArrayList<Object> history = new ArrayList<>();
     private DocumentInstance documentInstance;
 
-
+    private int accept = 0;
 
     /**
      * Constructor for making a server. It will set the port number, create a
@@ -272,9 +272,22 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
 
+            // TODO: new user test
+//            transmitAllButOne("stop", socket);
+//
+//            while (accept != users - 1);
+
             // TODO: change this when each doc has its own documentInstance
             out.writeObject(new Pair(documentInstance, history));
             out.flush();
+
+//            synchronized (lock) {
+//                accept = 0;
+//            }
+//
+//            input = in.readObject();
+//            if (((String) input).equals("continue")) transmitAllButOne("continue", socket);
+//            transmitAllButOne("continue", socket);
 
             // Sends to client the initial String in the document
             // TODO: Send encrypted doc
@@ -294,9 +307,13 @@ public class CollabServer implements CollabInterface {
 //            out.writeObject(history);
 //            out.flush();
 
-
             // Receives username of client. Updates users.
+//           Object username = in.readObject();
             input = in.readObject();
+//            if (!(username instanceof String)) {
+//                throw new RuntimeException("Expected client username");
+//            }
+//            clientName = (String) username;
             if (!(input instanceof String)) {
                 throw new RuntimeException("Expected client username");
             }
@@ -370,6 +387,13 @@ public class CollabServer implements CollabInterface {
             // send update to all other clients
             transmit((Operation) input); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
+            // TODO: new user test
+//        } else if (input instanceof String) {
+//            if (((String) input).equals("accept")) {
+//                synchronized (lock) {
+//                    accept++;
+//                }
+//            }
         } else {
             throw new RuntimeException("Unrecognized object type");
         }
@@ -455,6 +479,26 @@ public class CollabServer implements CollabInterface {
             // Otherwise we send the operation
             out = socketStreams.get(currentSocket).second;
             out.writeObject(delivery);
+            out.flush();
+        }
+    }
+
+    public void transmitAllButOne(Object o, Socket s) throws IOException {
+        // TODO: change the operation to an object that will be encrypted
+        ObjectOutputStream out = null;
+
+        // send operation to each one of the clients
+        for (int i = 1; i < clientSockets.size(); i++) {
+            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Socket currentSocket = p.first;
+            Boolean activeSocket = p.second;
+
+            // Connection is already closed
+            if (!activeSocket || currentSocket == s) continue;
+
+            // Otherwise we send the operation
+            out = socketStreams.get(currentSocket).second;
+            out.writeObject(o);
             out.flush();
         }
     }

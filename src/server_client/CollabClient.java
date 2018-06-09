@@ -212,6 +212,9 @@ public class CollabClient implements CollabInterface {
 				}
 				this.gui.setModelKey(document);
 
+				// TODO: new user test
+//				out.writeObject("continue");
+
 				JFrame frame = new JFrame("Collab Edit Demo");
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 				// Add content to the JFrame window.
@@ -275,6 +278,7 @@ public class CollabClient implements CollabInterface {
 //				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
 //			} else if (o.equals("stop")) {
 //				gui.newUser(false);
+//				out.writeObject("accept");
 //			} else if (o.equals("continue")) {
 //				gui.newUser(true);
 //			}
