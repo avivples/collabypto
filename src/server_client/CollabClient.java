@@ -15,6 +15,19 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
+import org.whispersystems.libsignal.*;
+import org.whispersystems.curve25519.*;
+import org.whispersystems.libsignal.ecc.Curve;
+import org.whispersystems.libsignal.state.PreKeyBundle;
+import org.whispersystems.libsignal.state.PreKeyRecord;
+import org.whispersystems.libsignal.state.SignalProtocolStore;
+import org.whispersystems.libsignal.state.SignedPreKeyRecord;
+import org.whispersystems.libsignal.state.impl.InMemorySignalProtocolStore;
+import org.whispersystems.libsignal.util.KeyHelper;
+import org.whispersystems.libsignal.util.Medium;
 
 /**
  * This is the client that will connect to a server. A unique instance of the
@@ -83,8 +96,45 @@ public class CollabClient implements CollabInterface {
             this.connect();
         } catch (IOException e) {
             new ErrorDialog(e.toString());
-        }
+        } catch (InvalidKeyException e) {
+			e.printStackTrace();
+		}
 
+	}
+
+	private void register () throws InvalidKeyException {
+		// TODO: At some point add authentication and also local store instead of only memory store
+		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
+		int registrationId  = KeyHelper.generateRegistrationId(true);
+		int startId = new Random().nextInt(Medium.MAX_VALUE);
+		List<PreKeyRecord> preKeys = KeyHelper.generatePreKeys(startId, 10000);
+		SignedPreKeyRecord signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, 5); // why 5?
+		// Create a list of PreKeyBundle
+		List<PreKeyBundle> alicePreKeyBundles = createPreKeyBundles(identityKeyPair, registrationId,
+				startId, preKeys, signedPreKey);
+		// Store (in memory for now, later using local DB)
+		SignalProtocolStore aliceStore = new InMemorySignalProtocolStore(identityKeyPair, registrationId);
+		for (PreKeyRecord pK : preKeys) {
+			aliceStore.storePreKey(pK.getId(), pK);
+		}
+		aliceStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
+
+		// TODO: Send to server the list of preKeyBundles
+	}
+
+	// TODO: Change to CircularArrayList
+	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
+												   int registrationId, int startId, List<PreKeyRecord> preKeys,
+												   SignedPreKeyRecord signedPreKey) {
+
+		List<PreKeyBundle> preKeyBundles = new ArrayList<>();
+		for (PreKeyRecord pK : preKeys) {
+			PreKeyBundle preKeyBundle = new PreKeyBundle(registrationId, 1, startId,
+					pK.getKeyPair().getPublicKey(), 5, signedPreKey.getKeyPair().getPublicKey(),
+					signedPreKey.getSignature(), identityKeyPair.getPublicKey());
+			preKeyBundles.add(preKeyBundle);
+		}
+		return preKeyBundles;
 	}
 
 
@@ -101,7 +151,7 @@ public class CollabClient implements CollabInterface {
 	 * @throws OperationEngineException if the operation caused an exception when being processed by
      * the operation engine
 	 */
-	public void connect() throws IOException {
+	public void connect() throws IOException, InvalidKeyException {
 
 	    // Establishes a socket connection
 		System.out.println("Connecting to port: " + this.port + " at: " + this.ip);
@@ -124,6 +174,10 @@ public class CollabClient implements CollabInterface {
 		try {
 			out = new ObjectOutputStream(s.getOutputStream());
 			in = new ObjectInputStream(s.getInputStream());
+
+			register();
+
+			// TODO: authentication
 
 			Object o= in.readObject();
 
