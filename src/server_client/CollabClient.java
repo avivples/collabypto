@@ -72,6 +72,8 @@ public class CollabClient implements CollabInterface {
 	/** client GUI used to display the document */
 	protected ClientGui gui;
 
+	protected InMemorySignalProtocolStore clientStore;
+
 	/**
 	 * Constructor to start the client. Simply sets the identifiers.
 	 * The connection to the server come later in the connect() call.
@@ -113,11 +115,11 @@ public class CollabClient implements CollabInterface {
 		List<PreKeyBundle> alicePreKeyBundles = createPreKeyBundles(identityKeyPair, registrationId,
 				startId, preKeys, signedPreKey);
 		// Store (in memory for now, later using local DB)
-		SignalProtocolStore aliceStore = new InMemorySignalProtocolStore(identityKeyPair, registrationId);
+		clientStore = new InMemorySignalProtocolStore(identityKeyPair, registrationId);
 		for (PreKeyRecord pK : preKeys) {
-			aliceStore.storePreKey(pK.getId(), pK);
+			clientStore.storePreKey(pK.getId(), pK);
 		}
-		aliceStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
+		clientStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
 
 		// TODO: Send to server the list of preKeyBundles
 	}
