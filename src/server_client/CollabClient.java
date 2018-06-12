@@ -288,7 +288,7 @@ public class CollabClient implements CollabInterface {
 				}
 
                 // TODO: new user test
-                out.writeObject("continue");
+//                out.writeObject("continue");
 			}
 		// if a new user, get the doc in server and the history of operations
 
@@ -335,16 +335,16 @@ public class CollabClient implements CollabInterface {
             out.flush();
             label = this.name + " is editing document: " + this.document;
 
-        } else if (o instanceof String) {
-		 	if (o.equals("give")) {
-				// TODO: encrypt and change this so we send the object we always speak of
-				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
-			} else if (o.equals("stop")) {
-				gui.newUser(false);
-				out.writeObject("accept");
-			} else if (o.equals("continue")) {
-				gui.newUser(true);
-			}
+//        } else if (o instanceof String) {
+//		 	if (o.equals("give")) {
+//				// TODO: encrypt and change this so we send the object we always speak of
+//				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
+//			} else if (o.equals("stop")) {
+//				gui.newUser(false);
+//				out.writeObject("accept");
+//			} else if (o.equals("continue")) {
+//				gui.newUser(true);
+//			}
             // The server just sent the initial string of the document
             // Start up the GUI with this string
 //			else {
@@ -425,7 +425,6 @@ public class CollabClient implements CollabInterface {
 					Operation op = operations[i];
 					op.setOrder(i);
 				if (op.getKey().equals(document)) {
-//					op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
 					if (op instanceof InsertOperation) {
 						doc.insert(op.getPosition(), op.getValue());
 					} else if (op instanceof DeleteOperation) {
