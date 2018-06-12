@@ -255,7 +255,7 @@ public class CollabClient implements CollabInterface {
 			} else if (plaintext instanceof DocumentInstance) {
 				DocumentInstance documentInstance = (DocumentInstance) plaintext;
 				String text = documentInstance.document;
-				ArrayList history = (ArrayList) decrypt(p.second);
+				ArrayList<Operation> history = (ArrayList) decrypt(p.second);
 				if (history.size() > 0) {
 					text = updateFromHistory(history, text);
 				}
@@ -278,8 +278,17 @@ public class CollabClient implements CollabInterface {
 				frame.setVisible(true);
 
 				// Updates the ContextVector of the GUI with the one sent by the server
-				ClientState cV = documentInstance.contextVector;
-				gui.getCollabModel().setCV(cV);
+//				ClientState cV = documentInstance.contextVector;
+				if (history.size() > 0) {
+					Operation lastOp = history.get(history.size() - 1);
+					ClientState cV = lastOp.getClientState();
+					gui.getCollabModel().setCV(cV);
+					lastOp.setOrder(history.size() - 1);
+					updateDoc(lastOp);
+				} else {
+					ClientState cV = documentInstance.contextVector;
+					gui.getCollabModel().setCV(cV);
+				}
 			}
 		// if a new user, get the doc in server and the history of operations
 
@@ -410,10 +419,10 @@ public class CollabClient implements CollabInterface {
 		System.err.println(history.size());
 		try {
 			doc.append(text);
-//			Operation[] operations = history.toArray(new Operation[history.size()]);
+			Operation[] operations = history.toArray(new Operation[history.size()]);
 
-			for (int i = 0; i < history.size(); i++) {
-					Operation op = history.get(i);
+			for (int i = 0; i < history.size() - 1; i++) {
+					Operation op = operations[i];
 					op.setOrder(i);
 				if (op.getKey().equals(document)) {
 //					op = this.gui.getCollabModel().getOE().pushRemoteOp(op);
