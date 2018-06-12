@@ -272,23 +272,26 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
 
+            Object username = in.readObject();
+
             // TODO: new user test
-//            transmitAllButOne("stop", socket);
-//
-//            while (accept != users - 1);
+            transmitAllButOne("stop", socket);
+
+            while (accept != users - 1);
 
             // TODO: change this when each doc has its own documentInstance
             out.writeObject(new Pair(documentInstance, history));
             out.flush();
 
-//            synchronized (lock) {
-//                accept = 0;
-//            }
-//
-//            input = in.readObject();
-//            if (((String) input).equals("continue")) transmitAllButOne("continue", socket);
-//            transmitAllButOne("continue", socket);
+            synchronized (lock) {
+                accept = 0;
+            }
 
+            if (users != 1) {
+                input = in.readObject();
+                if (input.equals("continue")) transmitAllButOne("continue", socket);
+//                transmitAllButOne("continue", socket);
+            }
             // Sends to client the initial String in the document
             // TODO: Send encrypted doc
 //            out.writeObject(documents.get(documentID).getText());
@@ -308,16 +311,17 @@ public class CollabServer implements CollabInterface {
 //            out.flush();
 
             // Receives username of client. Updates users.
-//           Object username = in.readObject();
-            input = in.readObject();
-//            if (!(username instanceof String)) {
+
+
+           if (!(username instanceof String)) {
+               throw new RuntimeException("Expected client username");
+           }
+           clientName = (String) username;
+//            input = in.readObject();
+//            if (!(input instanceof String)) {
 //                throw new RuntimeException("Expected client username");
 //            }
-//            clientName = (String) username;
-            if (!(input instanceof String)) {
-                throw new RuntimeException("Expected client username");
-            }
-            clientName = (String) input;
+//            clientName = (String) input;
             synchronized (lock) {
                 usernames.add(clientName);
 
@@ -388,12 +392,12 @@ public class CollabServer implements CollabInterface {
             transmit((Operation) input); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
             // TODO: new user test
-//        } else if (input instanceof String) {
-//            if (((String) input).equals("accept")) {
-//                synchronized (lock) {
-//                    accept++;
-//                }
-//            }
+        } else if (input instanceof String) {
+            if (input.equals("accept")) {
+                synchronized (lock) {
+                    accept++;
+                }
+            }
         } else {
             throw new RuntimeException("Unrecognized object type");
         }

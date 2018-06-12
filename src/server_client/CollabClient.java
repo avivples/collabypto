@@ -266,9 +266,6 @@ public class CollabClient implements CollabInterface {
 				}
 				this.gui.setModelKey(document);
 
-				// TODO: new user test
-//				out.writeObject("continue");
-
 				JFrame frame = new JFrame("Collab Edit Demo");
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 				// Add content to the JFrame window.
@@ -289,6 +286,9 @@ public class CollabClient implements CollabInterface {
 					ClientState cV = documentInstance.contextVector;
 					gui.getCollabModel().setCV(cV);
 				}
+
+                // TODO: new user test
+                out.writeObject("continue");
 			}
 		// if a new user, get the doc in server and the history of operations
 
@@ -335,16 +335,16 @@ public class CollabClient implements CollabInterface {
             out.flush();
             label = this.name + " is editing document: " + this.document;
 
-//        } else if (o instanceof String) {
-//		 	if (o.equals("give")) {
-//				// TODO: encrypt and change this so we send the object we always speak of
-//				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
-//			} else if (o.equals("stop")) {
-//				gui.newUser(false);
-//				out.writeObject("accept");
-//			} else if (o.equals("continue")) {
-//				gui.newUser(true);
-//			}
+        } else if (o instanceof String) {
+		 	if (o.equals("give")) {
+				// TODO: encrypt and change this so we send the object we always speak of
+				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
+			} else if (o.equals("stop")) {
+				gui.newUser(false);
+				out.writeObject("accept");
+			} else if (o.equals("continue")) {
+				gui.newUser(true);
+			}
             // The server just sent the initial string of the document
             // Start up the GUI with this string
 //			else {
