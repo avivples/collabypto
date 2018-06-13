@@ -40,7 +40,7 @@ public class UnDoAction extends AbstractAction {
 		try {
 			manager.undo();
 		} catch (CannotUndoException e) {
-			new ErrorDialog("Nothing to Undo man");
+			new ErrorDialog("Nothing to Undo");
 			Toolkit.getDefaultToolkit().beep();
 		}
 	}

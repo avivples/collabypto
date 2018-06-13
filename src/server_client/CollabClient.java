@@ -1,6 +1,7 @@
 package server_client;
 
 import document.*;
+import server_client.CollabModel;
 import gui.ClientGui;
 import gui.DocumentSelectionPage;
 import gui.ErrorDialog;
@@ -12,8 +13,23 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+
+import org.whispersystems.libsignal.*;
+import org.whispersystems.curve25519.*;
+import org.whispersystems.libsignal.ecc.Curve;
+import org.whispersystems.libsignal.state.PreKeyBundle;
+import org.whispersystems.libsignal.state.PreKeyRecord;
+import org.whispersystems.libsignal.state.SignalProtocolStore;
+import org.whispersystems.libsignal.state.SignedPreKeyRecord;
+import org.whispersystems.libsignal.state.impl.InMemorySignalProtocolStore;
+import org.whispersystems.libsignal.util.KeyHelper;
+import org.whispersystems.libsignal.util.Medium;
 
 /**
  * This is the client that will connect to a server. A unique instance of the
@@ -38,6 +54,12 @@ public class CollabClient implements CollabInterface {
 	private int siteID;
 	/** document the client is editing */
 	private String document = "";
+	/** list of clients current doc is shared with */
+	private String[] clientList;
+
+	// TODO: maybe not have mapping to PreKeyBundle but to shared key
+	// We need the PreKeyBundle once to generate the shared key, and we ratchet the shared key
+	private HashMap<String, PreKeyBundle> sessions;
 
 	/** port number of client */
 	private int port;
@@ -57,6 +79,8 @@ public class CollabClient implements CollabInterface {
 	protected ObjectInputStream in = null;
 	/** client GUI used to display the document */
 	protected ClientGui gui;
+
+	protected InMemorySignalProtocolStore clientStore;
 
 	/**
 	 * Constructor to start the client. Simply sets the identifiers.
@@ -82,8 +106,45 @@ public class CollabClient implements CollabInterface {
             this.connect();
         } catch (IOException e) {
             new ErrorDialog(e.toString());
-        }
+        } catch (InvalidKeyException e) {
+			e.printStackTrace();
+		}
 
+	}
+
+	private void register () throws InvalidKeyException {
+		// TODO: At some point add authentication and also local store instead of only memory store
+		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
+		int registrationId  = KeyHelper.generateRegistrationId(true);
+		int startId = new Random().nextInt(Medium.MAX_VALUE);
+		List<PreKeyRecord> preKeys = KeyHelper.generatePreKeys(startId, 100);
+		SignedPreKeyRecord signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, 5); // why 5?
+		// Create a list of PreKeyBundle
+		List<PreKeyBundle> alicePreKeyBundles = createPreKeyBundles(identityKeyPair, registrationId,
+				startId, preKeys, signedPreKey);
+		// Store (in memory for now, later using local DB)
+		clientStore = new InMemorySignalProtocolStore(identityKeyPair, registrationId);
+		for (PreKeyRecord pK : preKeys) {
+			clientStore.storePreKey(pK.getId(), pK);
+		}
+		clientStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
+
+		// TODO: Send to server the list of preKeyBundles
+	}
+
+	// TODO: Change to CircularArrayList
+	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
+												   int registrationId, int startId, List<PreKeyRecord> preKeys,
+												   SignedPreKeyRecord signedPreKey) {
+
+		List<PreKeyBundle> preKeyBundles = new ArrayList<>();
+		for (PreKeyRecord pK : preKeys) {
+			PreKeyBundle preKeyBundle = new PreKeyBundle(registrationId, 1, startId,
+					pK.getKeyPair().getPublicKey(), 5, signedPreKey.getKeyPair().getPublicKey(),
+					signedPreKey.getSignature(), identityKeyPair.getPublicKey());
+			preKeyBundles.add(preKeyBundle);
+		}
+		return preKeyBundles;
 	}
 
 
@@ -100,7 +161,7 @@ public class CollabClient implements CollabInterface {
 	 * @throws OperationEngineException if the operation caused an exception when being processed by
      * the operation engine
 	 */
-	public void connect() throws IOException {
+	public void connect() throws IOException, InvalidKeyException {
 
 	    // Establishes a socket connection
 		System.out.println("Connecting to port: " + this.port + " at: " + this.ip);
@@ -124,6 +185,16 @@ public class CollabClient implements CollabInterface {
 			out = new ObjectOutputStream(s.getOutputStream());
 			in = new ObjectInputStream(s.getInputStream());
 
+			register();
+
+			// TODO: authentication
+
+			try {
+				transmit(getUsername());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
 			Object o= in.readObject();
 
 			if(!(o instanceof ArrayList<?>)) {
@@ -145,8 +216,8 @@ public class CollabClient implements CollabInterface {
 		    }
 
 		    // Sends to server the document this client wants to edit
-			out.writeObject(document);
-			out.flush();
+//			out.writeObject(document);
+//			out.flush();
 
 			// Reads in operations from the server
 			o = in.readObject();
@@ -187,55 +258,25 @@ public class CollabClient implements CollabInterface {
 			Object plaintext = decrypt(ciphertext);
 			if (plaintext instanceof Operation) {
 				Operation op = (Operation) plaintext;
-				// this is the operation that was originally sent by this client, so we don't update
 				if (getID() == op.getSiteId()) return;
 				// We received an operation from the server. Update the local document
 				op.setOrder((Integer) p.second);
 				updateDoc(op);
-			}
-			if (plaintext instanceof ArrayList) {
+			} else if (plaintext instanceof ArrayList) {
 				// Updates list of current users and documents
 				ArrayList<String> users = (ArrayList<String>) plaintext;
 				ArrayList<String> documents = (ArrayList<String>) p.second;
 				this.gui.updateUsers(users.toArray());
 				this.gui.updateDocumentsList(documents.toArray());
-			}
-		// if a new user, get the doc in server and the history of operations
-        } else if (o instanceof ArrayList) {
-	    	ArrayList history = (ArrayList) o;
-			for (int i = 0; i < history.size(); i++) {
-				// TODO: Decrypt op
-				Operation op = (Operation) decrypt(history.get(i));
-				op.setOrder(i);
-				updateDoc(op);
-			}
-		}
-        // TODO: Decrypt o
-        else if (o instanceof Integer) {
-            // The server is sending the unique client identifiers
-            this.siteID = ((Integer) o).intValue();
-            if (this.name.equals("Anonymous"))
-                this.name += "" + this.siteID;
-            out.writeObject(this.name);
-            out.flush();
-            label = this.name + " is editing document: " + this.document;
-
-        } else if (o instanceof String) {
-
-	    	if (o.equals("stop")) {
-				gui.newUserStop();
-			} else if (o.equals("continue")) {
-				gui.newUserCont();
-			} else if (o.equals("give")) {
-	    		// TODO: encrypt and change this so we send the object we always speak of
-				transmit(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())));
-			} else {
-	    		// TODO: this will be changed accordingly initially client will not just get a string
-				// TODO: we'll create a new object that holds text, contextvector, list of operations
-				// The server just sent the initial string of the document
-				// Start up the GUI with this string
+			} else if (plaintext instanceof DocumentInstance) {
+				DocumentInstance documentInstance = (DocumentInstance) plaintext;
+				String text = documentInstance.document;
+				ArrayList<Operation> history = (ArrayList) decrypt(p.second);
+				if (history.size() > 0) {
+					text = updateFromHistory(history, text);
+				}
 				try {
-					this.gui = new ClientGui((String) o, this, label);
+					this.gui = new ClientGui(text, this, label);
 				} catch (OperationEngineException e) {
 					e.printStackTrace();
 				}
@@ -248,15 +289,101 @@ public class CollabClient implements CollabInterface {
 				// Display the window.
 				frame.pack();
 				frame.setVisible(true);
-			}
-        }
-        else if (o instanceof DocumentInstance) {
 
+				// Updates the ContextVector of the GUI with the one sent by the server
+//				ClientState cV = documentInstance.contextVector;
+				if (history.size() > 0) {
+					Operation lastOp = history.get(history.size() - 1);
+					ClientState cV = lastOp.getClientState();
+					gui.getCollabModel().setCV(cV);
+					lastOp.setOrder(history.size() - 1);
+					updateDoc(lastOp);
+				}
+// 				  else {
+//					ClientState cV = documentInstance.contextVector;
+//					gui.getCollabModel().setCV(cV);
+//				}
+
+                // TODO: new user test
+//                out.writeObject("continue");
+			}
+		// if a new user, get the doc in server and the history of operations
+
+        // TODO: Decrypt o
+//		} else if (o instanceof DocumentInstance) {
+//			// The server just sent the initial string of the document
+//			// Start up the GUI with this string
+//			DocumentInstance documentInstance = (DocumentInstance) o;
+//			String text = documentInstance.document;
+//			try {
+//				this.gui = new ClientGui(text, this, label);
+//			} catch (OperationEngineException e) {
+//				e.printStackTrace();
+//			}
+//			this.gui.setModelKey(document);
+//
+//			JFrame frame = new JFrame("Collab Edit Demo");
+//			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//			// Add content to the JFrame window.
+//			frame.add(this.gui);
+//			// Display the window.
+//			frame.pack();
+//			frame.setVisible(true);
+//
+//			// Updates the ContextVector of the GUI with the one sent by the server
+//			ClientState cV = documentInstance.contextVector;
+//			gui.getCollabModel().setCV(cV);
 		}
-        else if (o instanceof ClientState) {
-			// Updates the ContextVector of the GUI with the one sent by the server
-			CollabModel collab = this.gui.getCollabModel();
-			collab.setCV((ClientState) o);
+// 		else if (o instanceof ArrayList) {
+//			ArrayList history = (ArrayList) o;
+//			for (int i = 0; i < history.size(); i++) {
+//				// TODO: Decrypt op
+//				Operation op = (Operation) decrypt(history.get(i));
+//				op.setOrder(i);
+//				updateDoc(op);
+//			}
+//		}
+        else if (o instanceof Integer) {
+            // The server is sending the unique client identifiers
+            this.siteID = ((Integer) o).intValue();
+            if (this.name.equals("Anonymous"))
+                this.name += "" + this.siteID;
+            out.writeObject(this.name);
+            out.flush();
+            label = this.name + " is editing document: " + this.document;
+
+//        } else if (o instanceof String) {
+//		 	if (o.equals("give")) {
+//				// TODO: encrypt and change this so we send the object we always speak of
+//				transmit(new Pair(encrypt(new DocumentInstance(gui.getText(), gui.getCollabModel().copyOfCV())), true));
+//			} else if (o.equals("stop")) {
+//				gui.newUser(false);
+//				out.writeObject("accept");
+//			} else if (o.equals("continue")) {
+//				gui.newUser(true);
+//			}
+            // The server just sent the initial string of the document
+            // Start up the GUI with this string
+//			else {
+//				try {
+//					this.gui = new ClientGui((String) o, this, label);
+//				} catch (OperationEngineException e) {
+//					e.printStackTrace();
+//				}
+//				this.gui.setModelKey(document);
+//
+//				JFrame frame = new JFrame("Collab Edit Demo");
+//				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//				// Add content to the JFrame window.
+//				frame.add(this.gui);
+//				// Display the window.
+//				frame.pack();
+//				frame.setVisible(true);
+//			}
+//        } else if (o instanceof ClientState) {
+//			// Updates the ContextVector of the GUI with the one sent by the server
+//			CollabModel collab = this.gui.getCollabModel();
+//			collab.setCV((ClientState) o);
 //        } else if (o instanceof Pair<?, ?>) {
 //            // Updates list of current users and documents
 //            ArrayList<String> users = ((Pair<ArrayList<String>, ArrayList<String>>) o).first;
@@ -268,12 +395,13 @@ public class CollabClient implements CollabInterface {
         }
 	}
 
-	private Object decrypt(Object ciphertext) {
+	private Object decrypt(Object cipherText) {
 		// TODO
-		return ciphertext;
+		return cipherText;
 	}
 
 	private Object encrypt(Object plaintext) {
+		// TODO
 		return plaintext;
 	}
 
@@ -286,6 +414,7 @@ public class CollabClient implements CollabInterface {
 	@Override
 	public void updateDoc(Operation o) {
 		try {
+			if (getID() == o.getSiteId()) return;
 			if (o instanceof InsertOperation) {
 				this.gui.getCollabModel().remoteOp((Operation) o, true);
 			} else if (o instanceof DeleteOperation) {
@@ -302,6 +431,30 @@ public class CollabClient implements CollabInterface {
 		}
 	}
 
+	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
+		StringBuilder doc = new StringBuilder();
+		System.err.println(history.size());
+		try {
+			doc.append(text);
+			Operation[] operations = history.toArray(new Operation[history.size()]);
+
+			for (int i = 0; i < history.size() - 1; i++) {
+					Operation op = operations[i];
+					op.setOrder(i);
+				if (op.getKey().equals(document)) {
+					if (op instanceof InsertOperation) {
+						doc.insert(op.getPosition(), op.getValue());
+					} else if (op instanceof DeleteOperation) {
+						doc.delete(op.getPosition(), op.getPosition() + op.getValue().length());
+					}
+				}
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return doc.toString();
+	}
+
 	/**
 	 * @return the siteID of the document
 	 */
@@ -315,6 +468,7 @@ public class CollabClient implements CollabInterface {
 	 * @param o the operation to transmit to server
 	 * @throws IOException if the OutputStream is corrupted or broken
 	 */
+	@Override
 	public void transmit(Object o) throws IOException {
 		if (out == null)
 			throw new RuntimeException("Socket not initialized.");
@@ -322,13 +476,27 @@ public class CollabClient implements CollabInterface {
 		out.flush();
 	}
 
+	public Object[] readNewDocumentsList() throws IOException, ClassNotFoundException {
+		Object o = in.readObject();
+		if(o == null) {
+			return null;
+		}
+		if(!(o instanceof ArrayList)) {
+			throw new SocketException("Expected documents list");
+		}
+		ArrayList<String> documentsList = (ArrayList<String>) o;
+		return documentsList.toArray();
+	}
+
 	/**
 	 * Used by the document selector popup to set the
 	 * @param text new name of the document
 	 */
 	public void setDocument(String text) {
-		document = text;
+		this.document = text;
 	}
+
+	public void setClientList(String[] clientList) { this.clientList = clientList; }
 
 	/** @return ip address of client */
 	public String getIP() {

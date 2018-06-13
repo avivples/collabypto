@@ -7,8 +7,12 @@ import javax.swing.GroupLayout.Alignment;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+
 
 /*Gui Testing strategy:
  *   There are two buttons and two views for this GUI. The user have to options:
@@ -69,10 +73,32 @@ public class DocumentSelectionPage extends JFrame {
 	 */
 	public DocumentSelectionPage(ArrayList<String> documents,
                                  final CollabClient client) {
+
 		Collections.sort(documents);
 		JPanel mainPanel = new JPanel();
+		mainPanel.grabFocus();
+		Action updateDocuments = new AbstractAction("updateDocuments") {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+					try {
+						client.transmit("give documents please thanks");
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					}
+					try {
+						updateDocumentsList(client.readNewDocumentsList());
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					} catch (ClassNotFoundException e1) {
+						e1.printStackTrace();
+					}
+			}
+		};
+		mainPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
+		mainPanel.getActionMap().put("updateDocuments", updateDocuments);
 		setContentPane(mainPanel);
 		JPanel leftPane = new JPanel(new BorderLayout());
+		leftPane.requestFocusInWindow();
 		JLabel label = new JLabel(INSTRUCTION);
 		listDocumentModel = new DefaultListModel();
 		for (String doc : documents) {
@@ -83,6 +109,9 @@ public class DocumentSelectionPage extends JFrame {
 
 		listOfDocument.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		JScrollPane documentScrollPane = new JScrollPane(listOfDocument);
+		documentScrollPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
+		documentScrollPane.getActionMap().put("updateDocuments", updateDocuments);
+		documentScrollPane.requestFocusInWindow();
 		documentScrollPane.setPreferredSize(new Dimension(250, 145));
 		documentScrollPane.setMinimumSize(new Dimension(10, 10));
 		documentScrollPane.setAutoscrolls(true);
@@ -111,17 +140,33 @@ public class DocumentSelectionPage extends JFrame {
 		JPanel rightPane = new JPanel();
 		GroupLayout newDocumentLayout = new GroupLayout(rightPane);
 		documentInput = new JTextArea();
-
 		documentInput.setToolTipText("Enter the name of the Document");
+		documentInput.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
+		documentInput.getActionMap().put("updateDocuments", updateDocuments);
 		JButton newDocumentButton = new JButton(NEW_DOCUMENT);
 		newDocumentButton.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				if (documentInput.getText().length() > 0) {
+					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
+					String[] clientNames = clientCommas.split(",");
+					String[] clientList = new String[clientNames.length + 1];
+					for (int i = 0; i < clientList.length - 1; i++) {
+						clientList[i] = clientNames[i];
+					}
+					clientList[clientList.length - 1] = client.getUsername();
+					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
-					dispose();
+					client.setClientList(clientList);
+					try {
+						client.transmit(documentInput.getText());
+						client.transmit(clientList);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 
+					dispose();
 				} else {
 					new ErrorDialog("Please Enter the name of the Document");
 				}
@@ -166,4 +211,14 @@ public class DocumentSelectionPage extends JFrame {
 		listDocumentModel.removeElement(document);
 	}
 
+	public void updateDocumentsList(Object[] documents) {
+		listDocumentModel.clear();
+		if (documents.length > 0) {
+			for (Object i : documents) {
+				listDocumentModel.addElement(i);
+			}
+		}
+		this.repaint();
+		this.revalidate();
+	}
 }

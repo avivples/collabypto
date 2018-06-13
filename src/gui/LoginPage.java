@@ -5,13 +5,7 @@ import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-import javax.swing.GroupLayout;
-import javax.swing.JButton;
-import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JTextField;
-import javax.swing.SwingUtilities;
+import javax.swing.*;
 
 import server_client.CollabClient;
 
@@ -93,7 +87,7 @@ public class LoginPage extends JFrame{
                 String userName = userNameInput.getText();// get the Text From
                 // the user
                 if (userName.length() <= 0) {
-                    userName = DEFAULT_USERNAME;
+                    userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
                     userName = userNameInput.getText().trim();
                 }
@@ -119,7 +113,8 @@ public class LoginPage extends JFrame{
                 String userName = userNameInput.getText();// get the Text From
                 // the user
                 if (userName.length() <= 0) {
-                    userName = DEFAULT_USERNAME;
+//                    userName = DEFAULT_USERNAME;
+                    userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
                     userName = userNameInput.getText().trim();
                 }

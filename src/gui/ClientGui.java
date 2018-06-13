@@ -160,9 +160,7 @@ public class ClientGui extends JPanel {
     protected JToggleButton underlineButton;
 
     protected JButton undoButton;
-
     protected JButton redoButton;
-
     /**
      * make copy of document
      */
@@ -317,8 +315,8 @@ public class ClientGui extends JPanel {
         undoButton = new JButton(undo);
 
         ImageIcon redo = new ImageIcon("raw/redo.png");
-        redoButton = new JButton(redo);
 
+        redoButton = new JButton(redo);
         JMenuBar toolBar = new JMenuBar();
 
         // add all button to toolBar
@@ -595,22 +593,14 @@ public class ClientGui extends JPanel {
         this.collabModel.setKey(str);
     }
 
-    public void newUserStop() {
-        textArea.setEditable(false);
-        copyButton.setEnabled(false);
-        cutButton.setEnabled(false);
-        pasteButton.setEnabled(false);
-        undoButton.setEnabled(false);
-        redoButton.setEnabled(false);
+    // true - let client edit
+    // false - stop client from editing
+    public void newUser(boolean cont) {
+        textArea.setEditable(cont);
+        copyButton.setEnabled(cont);
+        cutButton.setEnabled(cont);
+        pasteButton.setEnabled(cont);
+        undoButton.setEnabled(cont);
+        redoButton.setEnabled(cont);
     }
-
-    public void newUserCont() {
-        textArea.setEditable(true);
-        copyButton.setEnabled(true);
-        cutButton.setEnabled(true);
-        pasteButton.setEnabled(true);
-        undoButton.setEnabled(true);
-        redoButton.setEnabled(true);
-    }
-
 }
