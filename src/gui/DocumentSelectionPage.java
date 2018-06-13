@@ -47,6 +47,7 @@ public class DocumentSelectionPage extends JFrame {
 	private static final String NEW_DOCUMENT = "New Document";
 	/** The JList that currently hold the list of documents to display */
 	JList listOfDocument;
+
 	/** The ArrayList that hold the names of all documents */
 
 	ArrayList<String> documents;
@@ -73,7 +74,6 @@ public class DocumentSelectionPage extends JFrame {
 	 */
 	public DocumentSelectionPage(ArrayList<String> documents,
                                  final CollabClient client) {
-
 		Collections.sort(documents);
 		JPanel mainPanel = new JPanel();
 		mainPanel.grabFocus();
@@ -123,8 +123,14 @@ public class DocumentSelectionPage extends JFrame {
 			public void actionPerformed(ActionEvent e) {
 				int index = listOfDocument.getSelectedIndex();
 				if (index != -1) {
-					client.setDocument((String) listDocumentModel.get(index));
-					dispose();
+				    String docName = (String) listDocumentModel.get(index);
+					client.setDocument(docName);
+                    try {
+                        client.transmit(docName);
+                    } catch (IOException e1) {
+                        e1.printStackTrace();
+                    }
+                    dispose();
 				} else {
 					new ErrorDialog(
 							"Please select the document you want to edit");

@@ -194,17 +194,13 @@ public class CollabClient implements CollabInterface {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-
 			Object o= in.readObject();
-
 			if(!(o instanceof ArrayList<?>)) {
                 throw new RuntimeException("Expected ArrayList of documents");
             }
-
 			// Popup for user to select document. We already checked above for object type
             @SuppressWarnings("unchecked")
             JFrame f = new DocumentSelectionPage((ArrayList<String>) o,this);
-
             // Waits until user selects document to edit. Calls setDocument() on return
             // to set the document to edit
 		    while (f.isVisible()) {
@@ -215,10 +211,11 @@ public class CollabClient implements CollabInterface {
                 }
 		    }
 
-		    // Sends to server the document this client wants to edit
-//			out.writeObject(document);
-//			out.flush();
-
+/*		    if(((DocumentSelectionPage) f).createdNewDocument) {
+                // Sends to server the document this client wants to edit if document selection page didnt do it before
+                out.writeObject(document);
+                out.flush();
+            }*/
 			// Reads in operations from the server
 			o = in.readObject();
 			while (o != null) {
@@ -282,7 +279,7 @@ public class CollabClient implements CollabInterface {
 				}
 				this.gui.setModelKey(document);
 
-				JFrame frame = new JFrame("Collab Edit Demo");
+				JFrame frame = new JFrame("Collabypto - Demo");
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 				// Add content to the JFrame window.
 				frame.add(this.gui);

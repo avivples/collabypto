@@ -7,6 +7,7 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,10 +41,6 @@ public class CollabServer implements CollabInterface {
      * maximum number of clients allowed at a time
      */
     private static final int MAX_CLIENTS = 30;
-    /**
-     * default document name
-     */
-    private static final String DEFAULT_DOC_NAME = "default";
     /**
      * lock object
      */
@@ -83,7 +80,7 @@ public class CollabServer implements CollabInterface {
     /**
      * Data structure to keep track of clients
      */
-    private final ArrayList<Pair<Socket, Boolean>> clientSockets = new ArrayList<Pair<Socket, Boolean>>();
+    private final ArrayList<Pair<String, Pair<Socket, Boolean>>> clientSockets = new ArrayList<>();
 
     /**
      * A hash of socket to its associated input/output streams. We want to use these
@@ -105,8 +102,8 @@ public class CollabServer implements CollabInterface {
 
     // TODO: Put history and documentInstance for every doc. For only one for testing
     private HashMap<String, String[]> clientLists = new HashMap<>();
-    private ArrayList<Object> history = new ArrayList<>();
-    private DocumentInstance documentInstance;
+    private HashMap<String, ArrayList<Object>> histories = new HashMap<String, ArrayList<Object>>();
+    private HashMap<String, DocumentInstance> documentInstances = new HashMap<String, DocumentInstance>();
 //    private int accept = 0;
 
     /**
@@ -155,7 +152,7 @@ public class CollabServer implements CollabInterface {
      * start up a server.
      * by calling the connect() method.
      *
-     * @throws OperationEngineException if the operation finds an incosistency
+     * @throws OperationEngineException if the operation finds an inconsistency
      */
     public void start() {
         try {
@@ -247,9 +244,7 @@ public class CollabServer implements CollabInterface {
                 throw new IOException("Expected client name");
             }
             while(true) {
-                ArrayList<String> temp = new ArrayList<String>();
                 ArrayList<String> clientDocuments = filteredList(clientName);
-//                temp.addAll(clientDocuments);
                 out.writeObject(clientDocuments);
                 out.flush();
 
@@ -271,7 +266,7 @@ public class CollabServer implements CollabInterface {
                 if (!documents.containsKey(documentID)) {
 
                     // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
-                    documentInstance = new DocumentInstance("");
+                    documentInstances.put(documentID, new DocumentInstance(""));
                     input = in.readObject();
                     if (input instanceof String[]) {
                         clientLists.put(documentID, (String[]) input);
@@ -286,7 +281,7 @@ public class CollabServer implements CollabInterface {
                 }
                 this.users++;
                 // Add to ArrayList of sockets
-                clientSockets.add(new Pair<Socket, Boolean>(socket, true));
+                clientSockets.add(new Pair(clientName, new Pair(socket, true)));
                 // sets client ID
                 clientID = clientSockets.size() - 1;
             }
@@ -305,7 +300,10 @@ public class CollabServer implements CollabInterface {
 //            while (accept != users - 1);
 
             // TODO: change this when each doc has its own documentInstance
-            out.writeObject(new Pair(documentInstance, history));
+            if(histories.get(documentID) == null) {
+                histories.put(documentID, new ArrayList<Object>());
+            }
+            out.writeObject(new Pair(documentInstances.get(documentID), histories.get(documentID)));
             out.flush();
 
 //            synchronized (lock) {
@@ -344,7 +342,6 @@ public class CollabServer implements CollabInterface {
 
             // Receives username of client. Updates users.
             input = in.readObject();
-            System.out.println(input.getClass());
             if (!(input instanceof String)) {
                 throw new RuntimeException("Expected client username");
             }
@@ -381,7 +378,7 @@ public class CollabServer implements CollabInterface {
             synchronized (lock) {
                 try {
                     // set client as inactive
-                    clientSockets.get(clientID).second = false;
+                    clientSockets.get(clientID).second.second = false;
                     this.users--;
                     usernames.remove(clientName);
                     // need to update the view of who still in the edit room
@@ -397,7 +394,7 @@ public class CollabServer implements CollabInterface {
         }
     }
 
-
+    //Returns a list of all documents given client has authorization to see
     public ArrayList<String> filteredList (String clientName) {
         ArrayList<String> clientDocuments = new ArrayList<>();
         for (String document : documents.keySet()) {
@@ -431,7 +428,7 @@ public class CollabServer implements CollabInterface {
 //            history.clear();
         if (input instanceof Operation) {
             // send update to all other clients
-            transmit((Operation) input); // also mutates the input
+            transmit((Operation) input, documentID); // also mutates the input
             //updateDoc((Operation) input);      // TODO: remove this
             // TODO: new user test
 //        } else if (input instanceof String) {
@@ -497,8 +494,7 @@ public class CollabServer implements CollabInterface {
      *
      * @throws IOException if the input/output stream is corrupt
      */
-    @Override
-    public void transmit(Object o) throws IOException {
+    public void transmit(Object o, String documentID) throws IOException {
         // TODO: change the operation to an object that will be encrypted
         ObjectOutputStream out = null;
         // Increment the order so the Operation Engine can determine
@@ -507,14 +503,14 @@ public class CollabServer implements CollabInterface {
         synchronized (lock) {
             // TODO: REMOVE THIS LINE. THIS WAS ONLY ADDED BACK SO SERVER UPDATES FOR NOW
             //o.setOrder(order);
-            history.add(o);
+            histories.get(documentID).add(o);
             delivery = new Pair<>(o, order);
             order++;
         }
 
         // send operation to each one of the clients
         for (int i = 1; i < clientSockets.size(); i++) {
-            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Pair<Socket, Boolean> p = clientSockets.get(i).second;
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
@@ -535,7 +531,7 @@ public class CollabServer implements CollabInterface {
 
         // send operation to each one of the clients
         for (int i = 1; i < clientSockets.size(); i++) {
-            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Pair<Socket, Boolean> p = clientSockets.get(i).second;
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
@@ -568,7 +564,7 @@ public class CollabServer implements CollabInterface {
         // For each client
         for (int i = 1; i < clientSockets.size(); i++) {
             // retrieve the sockets for the client
-            Pair<Socket, Boolean> p = clientSockets.get(i);
+            Pair<Socket, Boolean> p = clientSockets.get(i).second;
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
@@ -581,9 +577,9 @@ public class CollabServer implements CollabInterface {
             }
             out = socketStreams.get(currentSocket).second;
             // Creates a cloned pair of usernames and documents
-            Pair<ArrayList<String>, ArrayList<String>> pair = new Pair<ArrayList<String>, ArrayList<String>>(
+            Pair<ArrayList<String>, ArrayList<String>> pair = new Pair<>(
                     (ArrayList<String>) usernames.clone(),
-                    (ArrayList<String>) docs.clone());
+                     filteredList(clientSockets.get(i).first));
 
             // Sends it to the client
             out.writeObject(pair);
@@ -623,6 +619,11 @@ public class CollabServer implements CollabInterface {
     @Override
     public int getID() {
         return 0;
+    }
+
+    @Override
+    public void transmit(Object op) throws IOException {
+        //We have no use for this because I changed how transmit works (and we will need to change it again later for pairwise encryption) but the interface demands this
     }
 
     /**
