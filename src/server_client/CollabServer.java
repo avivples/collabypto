@@ -6,6 +6,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -103,9 +104,9 @@ public class CollabServer implements CollabInterface {
     private final HashMap<String, ServerGui> documents = new HashMap<String, ServerGui>();
 
     // TODO: Put history and documentInstance for every doc. For only one for testing
+    private HashMap<String, String[]> clientLists = new HashMap<>();
     private ArrayList<Object> history = new ArrayList<>();
     private DocumentInstance documentInstance;
-
 //    private int accept = 0;
 
     /**
@@ -119,7 +120,7 @@ public class CollabServer implements CollabInterface {
     public CollabServer(String IP, int port, String name) {
         // Sets server info
         this.port = port;
-        this.serverName = DEFAULT_DOC_NAME;
+//        this.serverName = DEFAULT_DOC_NAME;
         this.ip = IP;
         // Create a server socket for clients to connect to
         try {
@@ -130,20 +131,20 @@ public class CollabServer implements CollabInterface {
             return;
         }
         // Add default document to document list
-        try {
-            documents.put(DEFAULT_DOC_NAME,
-                    new ServerGui(this, this.serverName));
-            // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
-            documentInstance = new DocumentInstance(documents.get(DEFAULT_DOC_NAME).getText(),
-                    documents.get(DEFAULT_DOC_NAME).getCollabModel().copyOfCV());
-        } catch (OperationEngineException e) {
-            e.printStackTrace();
-        }
+//        try {
+//            documents.put(DEFAULT_DOC_NAME,
+//                    new ServerGui(this, this.serverName));
+//            // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
+//            documentInstance = new DocumentInstance(documents.get(DEFAULT_DOC_NAME).getText(),
+//                    documents.get(DEFAULT_DOC_NAME).getCollabModel().copyOfCV());
+//        } catch (OperationEngineException e) {
+//            e.printStackTrace();
+//        }
         // Update document list, set the current display GUI to be the default document
-        this.displayGui = documents.get(DEFAULT_DOC_NAME);
-        ArrayList<String> docs = new ArrayList<String>();
-        docs.addAll(documents.keySet());
-        this.displayGui.updateDocumentsList(docs.toArray());
+//        this.displayGui = documents.get(DEFAULT_DOC_NAME);
+//        ArrayList<String> docs = new ArrayList<String>();
+//        docs.addAll(documents.keySet());
+//        this.displayGui.updateDocumentsList(docs.toArray());
 
         // The server is viewed as the zeroth socket
         clientSockets.add(null);
@@ -176,14 +177,14 @@ public class CollabServer implements CollabInterface {
      *                     individual clients do *not* terminate serve()).
      */
     public void serve() throws IOException {
-        frame = new JFrame("Collab Edit Demo");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+//        frame = new JFrame("Collab Edit Demo");
+//        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         // Add content to the window.
-        frame.add(this.displayGui);
+//        frame.add(this.displayGui);
 
         // Display the window.
-        frame.pack();
-        frame.setVisible(true);
+//        frame.pack();
+//        frame.setVisible(true);
 
         while (true) {
             if (this.users > MAX_CLIENTS) {
@@ -238,21 +239,47 @@ public class CollabServer implements CollabInterface {
 
         try {
             // Sends list of documents to client
-            ArrayList<String> temp = new ArrayList<String>();
-            temp.addAll(documents.keySet());
-            out.writeObject(temp);
-            out.flush();
+            Object input;
+            input = in.readObject();
+            if (input instanceof String) {
+                clientName = (String) input;
+            } else {
+                throw new IOException("Expected client name");
+            }
+            while(true) {
+                ArrayList<String> temp = new ArrayList<String>();
+                ArrayList<String> clientDocuments = filteredList(clientName);
+//                temp.addAll(clientDocuments);
+                out.writeObject(clientDocuments);
+                out.flush();
 
-            // Receives which document to edit
-            Object input = in.readObject();
-            if (!(input instanceof String)) {
-                throw new RuntimeException("Expected document name");
+                // Receives which document to edit or f5 request
+                input = in.readObject();
+                if (!(input instanceof String)) {
+                    throw new RuntimeException("Expected document name or documents request");
+                }
+                else if(!input.equals("give documents please thanks")) { //Shouldn't be a string because someone can name his document this but whatever
+                    break;
+                }
             }
 
             synchronized (lock) {
                 // If document does not exist, create it
+
+                // TODO: client crashes if you use an existing document name. Maybe fix
                 documentID = (String) input;
                 if (!documents.containsKey(documentID)) {
+
+                    // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
+                    documentInstance = new DocumentInstance("");
+                    input = in.readObject();
+                    if (input instanceof String[]) {
+                        clientLists.put(documentID, (String[]) input);
+                    } else {
+                        throw new IOException("Expected client list");
+                    }
+
+                    // TODO: At some point remove this. WE DON'T WANT SERVER GUI
                     ServerGui newGui = new ServerGui(this, documentID);
                     newGui.setModelKey(documentID);
                     documents.put(documentID, newGui);
@@ -307,7 +334,7 @@ public class CollabServer implements CollabInterface {
 //            out.writeObject(history);
 //            out.flush();
 
-            // Receives username of client. Updates users.
+
 
             // TODO: new user test
 //           if (!(username instanceof String)) {
@@ -315,11 +342,13 @@ public class CollabServer implements CollabInterface {
 //           }
 //           clientName = (String) username;
 
+            // Receives username of client. Updates users.
             input = in.readObject();
+            System.out.println(input.getClass());
             if (!(input instanceof String)) {
                 throw new RuntimeException("Expected client username");
             }
-            clientName = (String) input;
+//            clientName = (String) input;
             synchronized (lock) {
                 usernames.add(clientName);
 
@@ -336,9 +365,10 @@ public class CollabServer implements CollabInterface {
             }
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
-        } catch (OperationEngineException e) {
-            e.printStackTrace();
+//        } catch (OperationEngineException e) {
+//            e.printStackTrace();
         } catch (Exception e) {
+            // TODO: Remove this when we don't care about errors in collabserver
             e.printStackTrace();
             return;
         } finally {
@@ -367,6 +397,20 @@ public class CollabServer implements CollabInterface {
         }
     }
 
+
+    public ArrayList<String> filteredList (String clientName) {
+        ArrayList<String> clientDocuments = new ArrayList<>();
+        for (String document : documents.keySet()) {
+            String[] clientList = clientLists.get(document);
+            for (int i = 0; i < clientList.length; i++) {
+                if (clientList[i].equals(clientName)) {
+                    clientDocuments.add(document);
+                    break;
+                }
+            }
+        }
+        return clientDocuments;
+    }
 
     /**
      * Takes an object that was received from the client and parses it. It
@@ -514,12 +558,12 @@ public class CollabServer implements CollabInterface {
     @SuppressWarnings("unchecked")
     public void updateUsers() throws IOException {
         ObjectOutputStream out = null;
-        this.displayGui.updateUsers(((ArrayList<String>) usernames.clone()).toArray());
+//        this.displayGui.updateUsers(((ArrayList<String>) usernames.clone()).toArray());
         ArrayList<String> docs = new ArrayList<String>();
         docs.addAll(documents.keySet());
         // Sorts the document list in alphabetical order
         Collections.sort(docs);
-        this.displayGui.updateDocumentsList(docs.toArray());
+//        this.displayGui.updateDocumentsList(docs.toArray());
 
         // For each client
         for (int i = 1; i < clientSockets.size(); i++) {

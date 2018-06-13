@@ -13,8 +13,10 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -52,6 +54,12 @@ public class CollabClient implements CollabInterface {
 	private int siteID;
 	/** document the client is editing */
 	private String document = "";
+	/** list of clients current doc is shared with */
+	private String[] clientList;
+
+	// TODO: maybe not have mapping to PreKeyBundle but to shared key
+	// We need the PreKeyBundle once to generate the shared key, and we ratchet the shared key
+	private HashMap<String, PreKeyBundle> sessions;
 
 	/** port number of client */
 	private int port;
@@ -109,7 +117,7 @@ public class CollabClient implements CollabInterface {
 		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
 		int registrationId  = KeyHelper.generateRegistrationId(true);
 		int startId = new Random().nextInt(Medium.MAX_VALUE);
-		List<PreKeyRecord> preKeys = KeyHelper.generatePreKeys(startId, 10000);
+		List<PreKeyRecord> preKeys = KeyHelper.generatePreKeys(startId, 100);
 		SignedPreKeyRecord signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, 5); // why 5?
 		// Create a list of PreKeyBundle
 		List<PreKeyBundle> alicePreKeyBundles = createPreKeyBundles(identityKeyPair, registrationId,
@@ -181,6 +189,12 @@ public class CollabClient implements CollabInterface {
 
 			// TODO: authentication
 
+			try {
+				transmit(getUsername());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
 			Object o= in.readObject();
 
 			if(!(o instanceof ArrayList<?>)) {
@@ -202,8 +216,8 @@ public class CollabClient implements CollabInterface {
 		    }
 
 		    // Sends to server the document this client wants to edit
-			out.writeObject(document);
-			out.flush();
+//			out.writeObject(document);
+//			out.flush();
 
 			// Reads in operations from the server
 			o = in.readObject();
@@ -284,10 +298,11 @@ public class CollabClient implements CollabInterface {
 					gui.getCollabModel().setCV(cV);
 					lastOp.setOrder(history.size() - 1);
 					updateDoc(lastOp);
-				} else {
-					ClientState cV = documentInstance.contextVector;
-					gui.getCollabModel().setCV(cV);
 				}
+// 				  else {
+//					ClientState cV = documentInstance.contextVector;
+//					gui.getCollabModel().setCV(cV);
+//				}
 
                 // TODO: new user test
 //                out.writeObject("continue");
@@ -461,13 +476,27 @@ public class CollabClient implements CollabInterface {
 		out.flush();
 	}
 
+	public Object[] readNewDocumentsList() throws IOException, ClassNotFoundException {
+		Object o = in.readObject();
+		if(o == null) {
+			return null;
+		}
+		if(!(o instanceof ArrayList)) {
+			throw new SocketException("Expected documents list");
+		}
+		ArrayList<String> documentsList = (ArrayList<String>) o;
+		return documentsList.toArray();
+	}
+
 	/**
 	 * Used by the document selector popup to set the
 	 * @param text new name of the document
 	 */
 	public void setDocument(String text) {
-		document = text;
+		this.document = text;
 	}
+
+	public void setClientList(String[] clientList) { this.clientList = clientList; }
 
 	/** @return ip address of client */
 	public String getIP() {

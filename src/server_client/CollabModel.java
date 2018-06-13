@@ -91,7 +91,7 @@ public class CollabModel extends DefaultStyledDocument {
     }
 
 
-    // WE ADDED THIS BACK BECAUSE IT WASN'T UPDATING THE INSERT, ONLY DELETE
+    // TODO: WE ADDED THIS BACK BECAUSE IT WASN'T UPDATING THE INSERT, ONLY DELETE
     /**
      * This is called by the TextChangeListener to update the local
      * OperationEngine and the StringBuilder This function will also call the
