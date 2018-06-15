@@ -2,107 +2,76 @@ package controller;
 
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.SimpleAttributeSet;
 
 import server_client.CollabModel;
-import gui.ClientGui;
 import document.OperationEngineException;
 
 /**
- * This class is the controller listener for changes in the main document, then
- * it will access the collabModel and make the update for the document
- * appropriately
- * 
- * @author viettran
+ * This is the listener for changes in the main document,
+ * Using the collabModel, we make the necessary updates for the document.
  * 
  */
 public class TextChangeListener implements DocumentListener {
-    @SuppressWarnings("unused")
-	/** clientGui or serverGUI */
-    private final ClientGui gui;
-	/** the underlying model */
-	private final CollabModel model;
 
-	/**
-	 * This construct takes in the view and the model and make the appropriate
-	 * changes
-	 * 
-	 * @param gui
-	 *            the clientGui or serverGui
-	 * @param model
-	 *            the underlying model
-	 */
-	public TextChangeListener(ClientGui gui, CollabModel model) {
-		this.gui = gui;
+    private final CollabModel model;
+
+	public TextChangeListener(CollabModel model) {
 		this.model = model;
-	}
+    }
 
 	/**
-	 * Unsupported for this program since we won't record any attribute change
-	 */
-	@Override
-	public void changedUpdate(DocumentEvent e) {
-
-	}
-
-	/**
-	 * This will get the insert Event from the model and get the text that
-	 * change and insert it to the appropriate place in the documents and send
-	 * out to other clients
+	 * Executes the insert operation at the correct location and send the update
+     * to the other clients.
 	 * 
-	 * @param e
-	 *            the insert Event modifies: collabModel
+	 * @param e insert event
 	 */
 	@Override
 	public void insertUpdate(DocumentEvent e) {		
-		int pos = e.getOffset();
-
+		int offset = e.getOffset();
 		String change = null;
 		try {
-			change = e.getDocument().getText(pos, e.getLength());
-		} catch (BadLocationException e1) {
-			e1.printStackTrace();
+			change = e.getDocument().getText(offset, e.getLength());
+		} catch (BadLocationException ex) {
+			ex.printStackTrace();
 		}
 
-		if (!model.remote) {
-			AttributeSet normal = new SimpleAttributeSet();
+		if (!this.model.remote) {
 			try {
-				model.addString(pos, change, normal);
-			} catch (OperationEngineException e1) {
-				e1.printStackTrace();
+				this.model.addString(offset, change);
+			} catch (OperationEngineException ex) {
+				ex.printStackTrace();
 			}
 		} else {
-			model.remote = false;
+			this.model.remote = false;
 		}
 
 	}
 
 	/**
-	 * This will get the delete Event from the model and get the text that
-	 * change and delete it from the appropriate place in the documents and send
-	 * out notification to other clients if they exit.
-	 * 
-	 * @param e
-	 *            the insert Event modifies: collabModel
+     * Executes the delete operation at the correct location and send the update
+     * to the other clients.
+     *
+	 * @param e delete event
 	 * */
 	@Override
 	public void removeUpdate(DocumentEvent e) {
-		int pos = e.getOffset();
-
+		int offset = e.getOffset();
 		int change = e.getLength();
-
-		if (!model.remote) {
-			AttributeSet normal = new SimpleAttributeSet();
+		if (!this.model.remote) {
 			try {
-				model.deleteString(pos, change, normal);
-			} catch (OperationEngineException e1) {
-				e1.printStackTrace();
+				this.model.deleteString(offset, change);
+			} catch (OperationEngineException ex) {
+				ex.printStackTrace();
 			}
 		} else {
-			model.remote = false;
+			this.model.remote = false;
 		}
 	}
+
+    @Override
+    public void changedUpdate(DocumentEvent e) {
+        // Nothing to do here for us
+    }
 
 }

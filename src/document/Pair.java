@@ -3,52 +3,30 @@ package document;
 import java.io.Serializable;
 
 /**
- * Pair represents a pair of values (x,y). x and y MAY NOT be null.
- * 
- * @param <X>
- *            Type of the first object
- * @param <Y>
- *            Type of the second object
+ * Pair represents a pair of _non-null_ values (x,y).
  */
 public class Pair<X, Y> implements Serializable {
 
     private static final long serialVersionUID = -8784148340029363617L;
 
-    /** First object with type X */
+    // First object with type X
     public X first;
-    
-    /** second object with type Y */
+    // second object with type Y
     public Y second;
 
-    // rep invariant: first, second != null
-
-    /**
-     * Constructor to make a pair.
-     * 
-     * @param first
-     *            Requires first != null.
-     * @param second
-     *            Requires second != null.
-     */
     public Pair(X first, Y second) {
-        if (first == null || second == null)
-            throw new NullPointerException();
+        if (first == null || second == null) throw new NullPointerException();
         this.first = first;
         this.second = second;
     }
 
-    /**
-     * override equals method and makes the appropriate test for equality
-     * @param o - check to see if Pair is equal to this object.
-     * @return true if equality, false otherwise
-     */
     @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
         }
 
-        if (o == null || !(o instanceof Pair<?, ?>)) {
+        if (!(o instanceof Pair<?, ?>)) {
             return false;
         }
 
@@ -57,10 +35,6 @@ public class Pair<X, Y> implements Serializable {
         return this.first.equals(otherFirst) && this.second.equals(otherSecond);
     }
 
-    /**
-     * Generates the correct hashcode for a given Pair instance
-     * @return hashcode of the pair
-     */
     @Override
     public int hashCode() {
         int result = 17;

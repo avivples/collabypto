@@ -18,6 +18,10 @@ import gui.ServerGui;
  * 	the main thread that running the program
  * @author viettran
  */
+
+// TODO: REMOVE THIS CLASS
+
+
 public class DocumentSelectionListener {
 	/** The collab Server that store the information about the documents */
 	private final CollabServer collabServer;

@@ -12,21 +12,10 @@ import javax.swing.JLabel;
 
 /**
  * This class will generate a pop up indicate the type of error that occur
- * during the connection. It won't affect anything in the program.
- *
- * Thread-safe: This is thread-safe since it seperate from any other thread and
- * it launches independently from other threads. Will close down when the user
- * close it.
- *
- * @author viettran
- *
- *
+ * during the connection.
  */
 public class ErrorDialog extends JDialog {
 
-    /**
-     *
-     */
     private static final long serialVersionUID = -7549769136652082371L;
 
     @SuppressWarnings("serial")
