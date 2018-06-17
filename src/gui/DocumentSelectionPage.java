@@ -77,10 +77,12 @@ public class DocumentSelectionPage extends JFrame {
 		Collections.sort(documents);
 		JPanel mainPanel = new JPanel();
 		mainPanel.grabFocus();
+		//creates an action that refreshes the document list, and binds it to F5.
 		Action updateDocuments = new AbstractAction("updateDocuments") {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 					try {
+						//asks the server for the list of documents.
 						client.transmit("give documents please thanks");
 					} catch (IOException e1) {
 						e1.printStackTrace();
@@ -155,6 +157,7 @@ public class DocumentSelectionPage extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				if (documentInput.getText().length() > 0) {
+					//when the client creates a new document, we ask them to provide the list of clients that can access the document.
 					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
 					String[] clientNames = clientCommas.split(",");
 					String[] clientList = new String[clientNames.length + 1];
@@ -166,6 +169,7 @@ public class DocumentSelectionPage extends JFrame {
 					client.setDocument(documentInput.getText());
 					client.setClientList(clientList);
 					try {
+						//give the document name and client list to the server.
 						client.transmit(documentInput.getText());
 						client.transmit(clientList);
 					} catch (IOException e) {

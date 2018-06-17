@@ -112,6 +112,7 @@ public class CollabClient implements CollabInterface {
 
 	}
 
+    //Creates a list of bundles to pass to the server, so the server can create sessions with other users.
 	private void register () throws InvalidKeyException {
 		// TODO: At some point add authentication and also local store instead of only memory store
 		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
@@ -132,7 +133,7 @@ public class CollabClient implements CollabInterface {
 		// TODO: Send to server the list of preKeyBundles
 	}
 
-	// TODO: Change to CircularArrayList
+
 	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
 												   int registrationId, int startId, List<PreKeyRecord> preKeys,
 												   SignedPreKeyRecord signedPreKey) {
@@ -211,11 +212,6 @@ public class CollabClient implements CollabInterface {
                 }
 		    }
 
-/*		    if(((DocumentSelectionPage) f).createdNewDocument) {
-                // Sends to server the document this client wants to edit if document selection page didnt do it before
-                out.writeObject(document);
-                out.flush();
-            }*/
 			// Reads in operations from the server
 			o = in.readObject();
 			while (o != null) {
@@ -247,6 +243,7 @@ public class CollabClient implements CollabInterface {
 	 */
 	@SuppressWarnings("unchecked")
     public void parseInput(Object o) throws IOException, OperationEngineException {
+	    //the server mostly sends pairs to the client - with an operation and its order, or a pair of the list of documents and list of users, or with a history of operations and document instance.
 	    if (o instanceof Pair) {
 	    	Pair p = (Pair) o;
 	    	Object ciphertext = p.first;
@@ -266,6 +263,7 @@ public class CollabClient implements CollabInterface {
 				this.gui.updateUsers(users.toArray());
 				this.gui.updateDocumentsList(documents.toArray());
 			} else if (plaintext instanceof DocumentInstance) {
+			    //we got history and documentinstance from the server, so update this user to the current state using the history.
 				DocumentInstance documentInstance = (DocumentInstance) plaintext;
 				String text = documentInstance.document;
 				ArrayList<Operation> history = (ArrayList) decrypt(p.second);
@@ -287,8 +285,7 @@ public class CollabClient implements CollabInterface {
 				frame.pack();
 				frame.setVisible(true);
 
-				// Updates the ContextVector of the GUI with the one sent by the server
-//				ClientState cV = documentInstance.contextVector;
+				// Updates the ContextVector of the GUI with the one sent by the server. We use the context vector of the last operation.
 				if (history.size() > 0) {
 					Operation lastOp = history.get(history.size() - 1);
 					ClientState cV = lastOp.getClientState();
@@ -296,50 +293,8 @@ public class CollabClient implements CollabInterface {
 					lastOp.setOrder(history.size() - 1);
 					updateDoc(lastOp);
 				}
-// 				  else {
-//					ClientState cV = documentInstance.contextVector;
-//					gui.getCollabModel().setCV(cV);
-//				}
-
-                // TODO: new user test
-//                out.writeObject("continue");
 			}
-		// if a new user, get the doc in server and the history of operations
-
-        // TODO: Decrypt o
-//		} else if (o instanceof DocumentInstance) {
-//			// The server just sent the initial string of the document
-//			// Start up the GUI with this string
-//			DocumentInstance documentInstance = (DocumentInstance) o;
-//			String text = documentInstance.document;
-//			try {
-//				this.gui = new ClientGui(text, this, label);
-//			} catch (OperationEngineException e) {
-//				e.printStackTrace();
-//			}
-//			this.gui.setModelKey(document);
-//
-//			JFrame frame = new JFrame("Collab Edit Demo");
-//			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-//			// Add content to the JFrame window.
-//			frame.add(this.gui);
-//			// Display the window.
-//			frame.pack();
-//			frame.setVisible(true);
-//
-//			// Updates the ContextVector of the GUI with the one sent by the server
-//			ClientState cV = documentInstance.contextVector;
-//			gui.getCollabModel().setCV(cV);
 		}
-// 		else if (o instanceof ArrayList) {
-//			ArrayList history = (ArrayList) o;
-//			for (int i = 0; i < history.size(); i++) {
-//				// TODO: Decrypt op
-//				Operation op = (Operation) decrypt(history.get(i));
-//				op.setOrder(i);
-//				updateDoc(op);
-//			}
-//		}
         else if (o instanceof Integer) {
             // The server is sending the unique client identifiers
             this.siteID = ((Integer) o).intValue();
@@ -428,6 +383,7 @@ public class CollabClient implements CollabInterface {
 		}
 	}
 
+	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
 	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
 		StringBuilder doc = new StringBuilder();
 		System.err.println(history.size());

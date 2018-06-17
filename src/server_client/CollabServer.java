@@ -235,20 +235,22 @@ public class CollabServer implements CollabInterface {
         socketStreams.put(socket, new Pair<ObjectInputStream, ObjectOutputStream>(in, out));
 
         try {
-            // Sends list of documents to client
             Object input;
+            //waits for client to write his name
             input = in.readObject();
             if (input instanceof String) {
                 clientName = (String) input;
             } else {
                 throw new IOException("Expected client name");
             }
+            //Stays here waiting for the user to choose a document. (his other option is pressing F5)
             while(true) {
+                // Sends list of documents to client
                 ArrayList<String> clientDocuments = filteredList(clientName);
                 out.writeObject(clientDocuments);
                 out.flush();
 
-                // Receives which document to edit or f5 request
+                // Receives which document to edit or F5 request
                 input = in.readObject();
                 if (!(input instanceof String)) {
                     throw new RuntimeException("Expected document name or documents request");
@@ -294,51 +296,14 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
 
-            // TODO: new user test
-//            Object username = in.readObject();
-//            transmitAllButOne("stop", socket);
-//            while (accept != users - 1);
-
-            // TODO: change this when each doc has its own documentInstance
+            //if this is a new document, create a new empty history list.
             if(histories.get(documentID) == null) {
                 histories.put(documentID, new ArrayList<Object>());
             }
+            //send the client the history of the document.
             out.writeObject(new Pair(documentInstances.get(documentID), histories.get(documentID)));
             out.flush();
 
-//            synchronized (lock) {
-//                accept = 0;
-//            }
-//
-//            if (users != 1) {
-//                input = in.readObject();
-//                if (input.equals("continue")) transmitAllButOne("continue", socket);
-//            }
-            // Sends to client the initial String in the document
-            // TODO: Send encrypted doc
-//            out.writeObject(documents.get(documentID).getText());
-//            out.flush();
-
-            // Sends to client the ContextVector of the document model
-//            try {
-//                out.writeObject(documents.get(documentID).getCollabModel().copyOfCV());
-//            } catch (OperationEngineException e) {
-//                e.printStackTrace();
-//            }
-            // TODO: need to not use ServerGui, instead use an object that holds the text and context vector
-//            out.writeObject(THIS OBJECT WE SPEAK OF);
-//            out.flush();
-
-//            out.writeObject(history);
-//            out.flush();
-
-
-
-            // TODO: new user test
-//           if (!(username instanceof String)) {
-//               throw new RuntimeException("Expected client username");
-//           }
-//           clientName = (String) username;
 
             // Receives username of client. Updates users.
             input = in.readObject();
@@ -422,21 +387,9 @@ public class CollabServer implements CollabInterface {
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
         // TODO: remove casting when we encrypt
-//        System.err.println(input.getClass());
-//        if (input instanceof Pair) {
-//            documentInstance = (DocumentInstance) ((Pair) input).first;
-//            history.clear();
         if (input instanceof Operation) {
             // send update to all other clients
             transmit((Operation) input, documentID); // also mutates the input
-            //updateDoc((Operation) input);      // TODO: remove this
-            // TODO: new user test
-//        } else if (input instanceof String) {
-//            if (input.equals("accept")) {
-//                synchronized (lock) {
-//                    accept++;
-//                }
-//            }
         } else {
             throw new RuntimeException("Unrecognized object type");
         }
@@ -501,8 +454,6 @@ public class CollabServer implements CollabInterface {
         // the relative position of all the operations
         Pair<Object, Integer> delivery;
         synchronized (lock) {
-            // TODO: REMOVE THIS LINE. THIS WAS ONLY ADDED BACK SO SERVER UPDATES FOR NOW
-            //o.setOrder(order);
             histories.get(documentID).add(o);
             delivery = new Pair<>(o, order);
             order++;
@@ -525,6 +476,7 @@ public class CollabServer implements CollabInterface {
         }
     }
 
+    //Transmits to all except given socket, currently unused (was used in an attempt to sync during new user joining to prevent crashes)
     public void transmitAllButOne(Object o, Socket s) throws IOException {
         // TODO: change the operation to an object that will be encrypted
         ObjectOutputStream out = null;
