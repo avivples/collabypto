@@ -11,50 +11,43 @@ import server_client.CollabClient;
 
 public class LoginPage extends JFrame{
 
-    /** Default local IP address */
+    // Default local IP address
     private static final String LOCAL_IP = "127.0.0.1";
-    /** Default server port to connect */
+    // Default server port to connect
     private static final int DEFAULT_PORT = 4444;
-    /** Default user name if the user doesn't supply one */
-    private static final String DEFAULT_USERNAME = "Anonymous";
+    // Port number of server
+    private int portNo;
 
-    /** The default width of the Window Frame */
-    private static final int WIDTH = 800;
-    /** The default height of the Window Frame */
-    private static final int HEIGHT = 400;
-    /** Prompt to the user */
+    // Prompt to the user
     private static final String PROMPT = "Please Enter user name, IP address"
-            + " and Port or Default for local connection";
-    /** Prompt quesion for IP adress */
+                                         + " and Port or Default for local connection";
+    // Prompt for IP
     private static final String IP = "Server IP";
-    /** Prompt quesion for PORT */
+    // Prompt for Port
     private static final String PORT = "Server Port";
-    /** The constant for JLabel in Provided Information Page */
+
+
     private static final String USER_NAME = "User Name";
-    /** contants represents string for default button */
     private static final String DEFAULT_BUTTON = "Default";
-    /** contants represents string for submit button */
     private static final String SUBMIT_BUTTON = "Submit";
 
-    /** User defined ip */
+    // User's IP input
     private JTextField ipInput;
-    /** user names of the user connects */
+    // User's username input
     private JTextField userNameInput;
-    /** User defined port */
+    // User's port input
     private JTextField portInput;
 
-    /** port number of the server */
-    private int portNo;
-    /** An instance to collabClient */
+    // Instance of client
     private CollabClient collabClient;
 
-    /** notify user when they enter wrong port number */
+    // Notify user when they enter wrong port number
     protected static final String WRONG_PORT_NUMBER = "Please enter correct port number (xx.xxx.xx.xx)";
-    /** notify user when they enter wrong IP or port number */
+    // Notify user when they enter wrong IP or port number
     private static final String WRONG_IP_OR_PORT = "Please correct your IP and Port number";
 
 
-    public LoginPage() { initGui(); }
+    private LoginPage() { initGui(); }
 
     private void initGui() {
 
@@ -78,14 +71,11 @@ public class LoginPage extends JFrame{
         JButton defaultVal = new JButton(DEFAULT_BUTTON);
         JButton submit = new JButton(SUBMIT_BUTTON);
 
-        String type = "server_client";
-
         defaultVal.addActionListener(new ActionListener() {
 
             @Override
             public void actionPerformed(ActionEvent arg0) {
-                String userName = userNameInput.getText();// get the Text From
-                // the user
+                String userName = userNameInput.getText(); // get the Text from the user
                 if (userName.length() <= 0) {
                     userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
@@ -94,13 +84,7 @@ public class LoginPage extends JFrame{
                 frame.dispose();
                 collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName);
 
-                Thread thread = new Thread() {
-                    @Override
-                    public void run() {
-                        collabClient.start();
-                    }
-                };
-
+                Thread thread = new Thread(() -> collabClient.start());
                 thread.start();
             }
         });
@@ -113,7 +97,6 @@ public class LoginPage extends JFrame{
                 String userName = userNameInput.getText();// get the Text From
                 // the user
                 if (userName.length() <= 0) {
-//                    userName = DEFAULT_USERNAME;
                     userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
                     userName = userNameInput.getText().trim();
@@ -130,11 +113,9 @@ public class LoginPage extends JFrame{
                             frame.dispose();
                             new ErrorDialog(WRONG_PORT_NUMBER);
                             SwingUtilities.invokeLater(new Runnable() {
-
                                 @Override
                                 public void run() {
                                     LoginPage.this.initGui();
-
                                 }
                             });
 
@@ -147,17 +128,15 @@ public class LoginPage extends JFrame{
                                 collabClient.start();
                             }
                         };
-
                         thread.start();
-                    } else {
+                    }
+                    else {
                         frame.dispose();
                         new ErrorDialog(WRONG_IP_OR_PORT);
                         SwingUtilities.invokeLater(new Runnable() {
-
                             @Override
                             public void run() {
                                 LoginPage.this.initGui();
-
                             }
                         });
 
@@ -166,14 +145,11 @@ public class LoginPage extends JFrame{
                     frame.dispose();
                     new ErrorDialog(WRONG_IP_OR_PORT);
                     SwingUtilities.invokeLater(new Runnable() {
-
                         @Override
                         public void run() {
                             LoginPage.this.initGui();
-
                         }
                     });
-
                 }
             }
         });
@@ -225,10 +201,7 @@ public class LoginPage extends JFrame{
             @Override
             public void run() {
                 JFrame frame = new LoginPage();
-
             }
         });
-
-
     }
 }

@@ -8,62 +8,29 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.KeyListener;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 
-
-/*Gui Testing strategy:
- *   There are two buttons and two views for this GUI. The user have to options:
- *  	if the user clicks on any availabel documents , he will be directed to that documents.
- *  	if the uesr type in new documents and clicks on new documents, new documents will be created
- *  	and he will be directed to the main document editing GUI.
- *      if the user selects any of the button without specifying the document or type in the document
- *      name , there will be an error dialog popup to ask him to specify those, but this won't affect
- *      the procudure at all.
- *      if the user close the window in this procedure, connection will be closed.
- *  
- */
-
 /**
- * The UI for the users to select the document to edit. This inheritted from
- * JFrame. Thread-safe argument: This UI is thread safe since every thing is
- * confined , and it exits when the user closes it.
- * 
- * @author viettran
- * 
+ * The UI for the users to select the document to edit.
  */
 public class DocumentSelectionPage extends JFrame {
-	/**
-	 * 
-	 */
+
 	private static final long serialVersionUID = 8079538911030861097L;
-	/** Instruction for user */
+
 	private static final String INSTRUCTION = "Select Document to Edit Or Create New Document";
-	/** constant string for select button */
 	private static final String SELECT_BUTTON = "Select Document";
-	/** constant string for making new document button */
 	private static final String NEW_DOCUMENT = "New Document";
-	/** The JList that currently hold the list of documents to display */
-	JList listOfDocument;
 
-	/** The ArrayList that hold the names of all documents */
+	// Holds the list of documents to display
+	private JList listOfDocument;
+    private DefaultListModel listDocumentModel;
+    // Holds name of created document
+	private JTextArea documentInput;
 
-	ArrayList<String> documents;
-	/**
-	 * The underlying list documents model that in charge of modifying the
-	 * internal documents
-	 */
-	DefaultListModel listDocumentModel;
-	/** The Button used to select the documents to edit */
-	JButton selectButton;
-	/** JTextArea to hold the name of new document created */
-	JTextArea documentInput;
-	/** The server_client */
-	CollabClient client;
 
-	/**
+    /**
 	 * This constructor takes in the list of documents and the server_client to create
 	 * the GUI directly after created
 	 * 
@@ -72,8 +39,7 @@ public class DocumentSelectionPage extends JFrame {
 	 * @param client
 	 *            the CollabClient
 	 */
-	public DocumentSelectionPage(ArrayList<String> documents,
-                                 final CollabClient client) {
+	public DocumentSelectionPage(ArrayList<String> documents, final CollabClient client) {
 		Collections.sort(documents);
 		JPanel mainPanel = new JPanel();
 		mainPanel.grabFocus();
@@ -89,9 +55,7 @@ public class DocumentSelectionPage extends JFrame {
 					}
 					try {
 						updateDocumentsList(client.readNewDocumentsList());
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					} catch (ClassNotFoundException e1) {
+					} catch (IOException | ClassNotFoundException e1) {
 						e1.printStackTrace();
 					}
 			}
@@ -137,7 +101,6 @@ public class DocumentSelectionPage extends JFrame {
 					new ErrorDialog(
 							"Please select the document you want to edit");
 				}
-
 			}
 		});
 
@@ -161,9 +124,7 @@ public class DocumentSelectionPage extends JFrame {
 					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
 					String[] clientNames = clientCommas.split(",");
 					String[] clientList = new String[clientNames.length + 1];
-					for (int i = 0; i < clientList.length - 1; i++) {
-						clientList[i] = clientNames[i];
-					}
+                    System.arraycopy(clientNames, 0, clientList, 0, clientList.length - 1);
 					clientList[clientList.length - 1] = client.getUsername();
 					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
@@ -175,7 +136,6 @@ public class DocumentSelectionPage extends JFrame {
 					} catch (IOException e) {
 						e.printStackTrace();
 					}
-
 					dispose();
 				} else {
 					new ErrorDialog("Please Enter the name of the Document");
@@ -201,27 +161,7 @@ public class DocumentSelectionPage extends JFrame {
 
 	}
 
-	/**
-	 * This will add the appropriate document to the underlying listModel
-	 * 
-	 * @param document
-	 *            modifies: the listModel
-	 */
-	public void addDocument(String document) {
-		listDocumentModel.addElement(document);
-	}
-
-	/**
-	 * This will delete the appropriate document from the underlying listModel
-	 * 
-	 * @param document
-	 *            modifies: the listModel
-	 */
-	public void deleteDocument(String document) {
-		listDocumentModel.removeElement(document);
-	}
-
-	public void updateDocumentsList(Object[] documents) {
+	private void updateDocumentsList(Object[] documents) {
 		listDocumentModel.clear();
 		if (documents.length > 0) {
 			for (Object i : documents) {

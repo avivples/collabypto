@@ -12,170 +12,98 @@ import java.util.Vector;
  * type can allow for creating from various different calls, as well as
  * transforming due to concurrent operations. This is the major part where we
  * will write the transformation algorithm in the subclasses of this class.
- * 
- * Thread safety argument: This class is thread safe because this data is
- * generated, and modified by only one thread. Therefore, there should be no
- * locking or deadlocking, or memory issues.
- * 
- * @author Hanwen Xu
- * 
  */
 public abstract class Operation implements Serializable {
 
-    /**
-     * the ID number, for serializing
-     */
     private static final long serialVersionUID = -4459256618218580312L;
-    /**
-     * no more magic number
-     */
-    protected final static int infinity = Integer.MAX_VALUE;
-    /**
-     * siteId: Integer client ID where the op originated
-     */
-    protected int siteId;
-    /**
-     * seqId: The number of operation processed at this clientID
-     */
-    protected int seqId;
 
-    /**
-     * type of operation, such as delete or insert
-     */
-    protected String type = null;
+    // Client ID who created operation
+    int siteId;
+    // ID number of operation processed at this client
+    int seqId;
+    // Type of operation: insert or delete
+    String type;
+    // State machine of client who created operation
+    ClientState clientState = null;
 
-    /**
-     * boolean variable denoting if this operation was performed locally
-     */
-    protected boolean local = false;
-
-    /**
-     * state machine of the client when the operation was created.
-     */
-    protected ClientState clientState = null;
-
-    /**
-     * The document that is being modified by this operation
-     */
+    // Denotes if operation was performed locally
+    boolean local = false;
+    // Document where operation is made
     protected String key = null;
 
-    /**
-     * The value being inserted, string.
-     */
-    protected String value = null;
+    // String being inserted
+    String value = null;
+    // Offset of the operation
+    int offset;
 
-    /**
-     * The offset of the operation.
-     */
-    protected int position;
-
-    /**
-     * The universal order in which the server received this operation. Doesn't
-     * matter for local operations.
-     */
+    // Global order of the operation (does not include local operations)
     private int order;
+    // Indicates if operation is immutable
+    boolean immutable;
+
+    // Store referenceable operations
+    Vector<Operation> xCache = null;
 
     /**
-     * If this operation is mutable or not.
-     */
-    protected boolean immutable;
-
-    /**
-     * Place to store referenceable operations
-     */
-    protected Vector<Operation> xCache = null;
-
-    /**
-     * This is a constructor which returns a new operation. This allows creation
-     * after specifying what type of operation is desired. This will then call
-     * the constructor of the subclasses and return a new operation.
-     * 
-     * @param type
-     *            , requires to be either insert, delete, or update
-     * @param args
-     *            , requires to be a map of correct type
-     * @returns a new Operation of the specified subtype, returns null if the
-     *          type is not matched correctly
+     * Create a new operation specified by the type (insert or delete)
+     *
+     * @param type operation type (insert/delete)
+     * @param properties defined in Operation function
+     * @returns a new Operation
      * @throws OperationEngineException
-     *             if any of the operation creation function fails.
      */
-    public static Operation createOperationFromType(String type,
-            Map<String, Object> properties) throws OperationEngineException {
+    public static Operation createOperationFromType(String type, Map<String, Object> properties) throws OperationEngineException {
         Operation op = null;
-
         if (type.equals("insert")) {
             op = new InsertOperation(properties);
         } else if (type.equals("delete")) {
             op = new DeleteOperation(properties);
-        } else if (type.equals("update")) {
-            op = new UpdateOperation(properties);
         }
 
         return op;
     }
 
     /**
-     * This is another constructor of the Operation class. By using a object
-     * array state, we can construct a new operation
-     * 
-     * @param state
-     *            , requires to be an object array
-     * @return new operation
-     * @throws OperationEngineException
-     */
-    public static Operation createOperationFromState(Object[] state)
-            throws OperationEngineException {
-        return null;
-    }
-
-    /**
-     * We will use this function to create a unique history key so that its
-     * history of operations can be referenced easily
-     * 
-     * @param site
-     *            , requires to be any integer of the site of the IP
-     * @param seq
-     *            , requires to be another integer of the sequence
+     * Create a unique history key so that its history of operations can be referenced easily
+     *
+     * @param site client ID
+     * @param seq integer reprsenting the sequence
      * @return a new string that will serve as a key.
      */
     public static String createHistoryKey(int site, int seq) {
-        return new Integer(site).toString() + "," + new Integer(seq).toString();
+        return Integer.toString(site) + ", " + Integer.toString(seq);
     }
 
     @Override
     public String toString() {
-        StringBuffer b = new StringBuffer();
-        b.append("{siteId : " + this.siteId);
-        b.append(",seqId : " + this.seqId);
-        b.append(",type :" + type);
-        b.append(",contextVector : " + this.clientState);
-        b.append(",key : " + this.key);
-        b.append(",position : " + this.position);
-        b.append(",value : " + this.value);
-        b.append(",order : " + this.getOrder());
-        b.append("}");
-
-        return b.toString();
+        String b = ("{siteId : " + this.siteId) +
+                    ",seqId : " + this.seqId +
+                    ",type :" + type +
+                    ",contextVector : " + this.clientState +
+                    ",key : " + this.key +
+                    ",position : " + this.offset +
+                    ",value : " + this.value +
+                    ",order : " + this.getOrder() + "}";
+        return b;
     }
 
     /**
      * Contains information about a local or remote event for transformation.
-     * 
+     *
      * Initializes the operation from serialized state or individual props if
      * state is not defined in the args parameter.
-     * 
+     *
+     * Properties contains the following information:
+     *  siteID: client ID who created the operation
+     *  contextVector: context in which the operation occurred
+     *  key: document where operation occurred
+     *  value: value (string) of operation
+     *  offset: offset of hte operation
+     *  order: the operation's order in the global ordering of all operations
+     *  seqID: sequence number of the operation at its originating site
+     *  immutable: indicates if operation cannot be changed
+     *
      * @param properties
-     *            Map containing the following: state: Array in format returned
-     *            by getState bundling the following individual parameter values
-     *            siteId: Integer site ID where the op originated contextVector:
-     *            Context in which the op occurred key: Name of the property the
-     *            op affected value: Value of the op position: Integer position
-     *            of the op in a linear collection order: Integer sequence
-     *            number of the op in the total op order across all sites seqId:
-     *            Integer sequence number of the op at its originating site. If
-     *            undefined, computed from the context vector and site ID.
-     *            immutable: True if the op cannot be changed, most likely
-     *            because it is in a history buffer somewhere to this instance
      * @throws OperationEngineException
      */
     @SuppressWarnings("unchecked")
@@ -190,27 +118,25 @@ public abstract class Operation implements Serializable {
             this.setState((Object[]) properties.get("state"));
             this.local = false;
         } else {
-            this.siteId = ((Integer) properties.get("siteId")).intValue();
-            this.clientState = (ClientState) properties
-                    .get("contextVector");
+            this.siteId = (Integer) properties.get("siteId");
+            this.clientState = (ClientState) properties.get("contextVector");
             this.key = (String) properties.get("key");
             this.value = (String) properties.get("value");
-            this.position = ((Integer) properties.get("position")).intValue();
+            this.offset = (Integer) properties.get("position");
 
             Integer ord = (Integer) properties.get("order");
             if (ord == null) {
-                this.setOrder(Operation.infinity);
+                this.setOrder(Integer.MAX_VALUE);
             } else {
-                this.setOrder(ord.intValue());
+                this.setOrder(ord);
             }
 
             if (properties.containsKey("seqId")) {
-                this.seqId = ((Integer) properties.get("seqId")).intValue();
+                this.seqId = (Integer) properties.get("seqId");
             } else if (this.clientState != null) {
                 this.seqId = this.clientState.getSeqForClient(this.siteId) + 1;
             } else {
-                throw new OperationEngineException(
-                        "missing sequence id for new operation");
+                throw new OperationEngineException("Missing sequence ID for new operation.");
             }
 
             if (properties.containsKey("xCache")) {
@@ -219,7 +145,7 @@ public abstract class Operation implements Serializable {
                 this.xCache = null;
             }
 
-            this.local = ((Boolean) properties.get("local")).booleanValue() || false;
+            this.local = (Boolean) properties.get("local");
         }
 
         this.immutable = false;
@@ -230,90 +156,66 @@ public abstract class Operation implements Serializable {
     }
 
     /**
-     * This function will return a new operation after transforming the current
-     * operation with the specified data type
-     * 
-     * @param op
-     *            requires to be an operation
-     * @return a new operation that is transformed after the specified operation
-     *         is applied
+     * Returns a new operation after transforming the current operation with the specified data type
+     *
+     * @param op operation
+     * @return a new operation that is transformed after specified operation is applied
      */
     public abstract Operation transformWithDelete(Operation op);
 
     public abstract Operation transformWithInsert(Operation op);
 
-    public abstract Operation transformWithUpdate(Operation op);
-
-    /**
-     * Serializes the operation as an array of values for transmission. Also
-     * useful for copying the operation and sharing with other operations, or
-     * functions, or classes
-     * 
-     * @return {Object[]} Array with the name of the operation type and all of
-     *         its instance variables as primitive JS types
-     */
-    public Object[] getState() {
-        Object[] properties = { this.type, this.key, this.value, this.position,
-                this.clientState.getState(), this.seqId, this.siteId,
-                this.getOrder() };
-
-        return properties;
-    }
 
     /**
      * Can use this function to copy another operation, and set all of the
      * parameters, given a correct state object array.
-     * 
+     *
      * @param properties
      *            Array in the format returned by getState
      * @throws OperationEngineException
      */
     public void setState(Object[] properties) throws OperationEngineException {
-        if (!((String) properties[0]).equals(this.type)) {
-            throw new OperationEngineException(
-                    "setState invoked with state from wrong op type");
+        if (!properties[0].equals(this.type)) {
+            throw new OperationEngineException("setState invoked with state from wrong operation type.");
         } else if (this.immutable) {
-            throw new OperationEngineException("op is immutable");
+            throw new OperationEngineException("Operation is immutable.");
         }
 
         this.key = (String) properties[1];
         this.value = (String) properties[2];
-        this.position = ((Integer) properties[3]).intValue();
+        this.offset = (Integer) properties[3];
 
         HashMap<String, Object> args = new HashMap<String, Object>();
-        args.put("state", (Object[]) properties[4]);
+        args.put("state", properties[4]);
 
         this.clientState = new ClientState(args);
 
-        this.seqId = ((Integer) properties[5]).intValue();
-        this.siteId = ((Integer) properties[6]).intValue();
+        this.seqId = (Integer) properties[5];
+        this.siteId = (Integer) properties[6];
 
         if (properties.length >= 8) {
-            this.setOrder(((Integer) properties[7]).intValue());
+            this.setOrder((Integer) properties[7]);
         } else {
-            this.setOrder(Operation.infinity);
+            this.setOrder(Integer.MAX_VALUE);
         }
     }
 
     /**
-     * Makes a copy of this operation object. Takes a shortcut and returns a ref
-     * to this instance if the op is marked as mutable.
-     * 
+     * Makes a copy of this operation object.
+     *
      * @throws OperationEngineException
-     * 
-     * @return Operation object
+     * @return copy of this Operation object
      */
     public Operation copy() throws OperationEngineException {
         HashMap<String, Object> properties = new HashMap<String, Object>();
-
-        properties.put("siteId", new Integer(this.siteId));
-        properties.put("seqId", new Integer(this.seqId));
+        properties.put("siteId", this.siteId);
+        properties.put("seqId", this.seqId);
         properties.put("contextVector", this.clientState.copy());
         properties.put("key", this.key);
         properties.put("value", this.value);
-        properties.put("position", new Integer(this.position));
-        properties.put("order", new Integer(this.getOrder()));
-        properties.put("local", new Boolean(this.local));
+        properties.put("position", this.offset);
+        properties.put("order", this.getOrder());
+        properties.put("local", this.local);
         properties.put("xCache", this.xCache);
 
         Operation op;
@@ -323,22 +225,18 @@ public abstract class Operation implements Serializable {
             e.printStackTrace();
             op = null;
         }
-
         return op;
     }
 
     /**
      * Gets a version of the given operation previously transformed into the
      * given context if available.
-     * 
-     * @param cv
-     *            Context of the transformed op to seek
+     *
+     * @param cv context of the transformed op to seek
      * @throws OperationEngineException
-     * @return Copy of the transformed operation from the cache or null if not
-     *         found in the cache
+     * @return Copy of the transformed operation from the cache or null if not in cache
      */
-    public Operation getFromCache(ClientState cv)
-            throws OperationEngineException {
+    public Operation getFromCache(ClientState cv) throws OperationEngineException {
         Vector<Operation> cache = this.xCache;
         int l = cache.size();
         Operation xop;
@@ -356,9 +254,8 @@ public abstract class Operation implements Serializable {
     /**
      * Caches a transformed copy of this original operation for faster future
      * transformations.
-     * 
-     * @param siteCount
-     *            Integer count of active sites, including the local one
+     *
+     * @param siteCount  number of active sites, including the local one
      * @throws OperationEngineException
      */
     public void addToCache(int siteCount) throws OperationEngineException {
@@ -384,33 +281,10 @@ public abstract class Operation implements Serializable {
 
     /**
      * Computes an ordered comparison of this op and another based on their
-     * context vectors. Used for sorting operations by their contexts.
-     * 
-     * @param op
-     *            Other operation
-     * @return -1 if this op is ordered before the other, 0 if they are in the
-     *         same context, and 1 if this op is ordered after the other
-     */
-    public int compareByState(Operation op) {
-        int rv = this.clientState.compare(op.clientState);
-        if (rv == 0) {
-            if (this.siteId < op.siteId) {
-                return -1;
-            } else if (this.siteId > op.siteId) {
-                return 1;
-            } else {
-                return 0;
-            }
-        }
-        return rv;
-    }
-
-    /**
-     * Computes an ordered comparison of this op and another based on their
      * position in the total op order. If the order is the same, then we have to
      * take into account which one was local, and assign that priority. If they
      * are both local or both remote, then we take into account the SeqID.
-     * 
+     *
      * @param op
      *            Other operation
      * @return -1 if this op is ordered before the other, 0 if they are in the
@@ -418,55 +292,46 @@ public abstract class Operation implements Serializable {
      */
     public int compareByOrder(Operation op) {
         if (this.getOrder() == op.getOrder()) {
+
             if (this.local == op.local) {
-                int solution;
-                if (this.seqId < op.seqId) {
-                    solution = -1;
-                } else {
-                    solution = 1;
-                }
-                return solution;
-            } else if (this.local && !op.local) {
+                if (this.seqId < op.seqId) return 1;
+                else return -1;
+            }
+            else if (this.local) {
                 return 1;
-            } else if (!this.local && op.local) {
+            }
+            else {
                 return -1;
             }
-        } else if (this.getOrder() < op.getOrder()) {
-            return -1;
-        } else if (this.getOrder() > op.getOrder()) {
+        }
+        else if (this.getOrder() < op.getOrder()) {
             return 1;
         }
-
-        return -1;
+        else {
+            return -1;
+        }
     }
 
     /**
      * Transforms this operation to include the effects of the operation
-     * provided as a parameter IT(this, op). Upgrade the context of this op to
+     * provided as a parameter IT(this, op). Upgrade the context of this operation to
      * reflect the inclusion of the other.
-     * 
-     * @throws OperationEngineException
-     * 
-     * @return This operation, transformed in-place, or null if its effects are
-     *         nullified by the transform
-     * @throws {Error} If this op to be transformed is immutable or if the this
-     *         operation subclass does not implement the transform method needed
-     *         to handle the passed op
+     *
+     * @return This operation, transformed in-place
+     * @throws OperationEngineException If this op to be transformed is immutable
      */
     public Operation transformWith(Operation op)
             throws OperationEngineException {
         if (this.immutable) {
-            throw new OperationEngineException(
-                    "attempt to transform immutable op");
+            throw new OperationEngineException("Attempt to transform immutable operation.");
         }
 
         Operation rv = null;
         if (op.type.equals("delete")) {
             rv = this.transformWithDelete(op);
-        } else if (op.type.equals("insert")) {
+        }
+        else if (op.type.equals("insert")) {
             rv = this.transformWithInsert(op);
-        } else if (op.type.equals("update")) {
-            rv = this.transformWithUpdate(op);
         }
 
         if (rv != null) {
@@ -478,12 +343,10 @@ public abstract class Operation implements Serializable {
 
     /**
      * Upgrades the context of this operation to reflect the inclusion of a
-     * single other operation from some site.
-     * 
-     * @param op
-     *            The operation to include in the context of this op
-     * @throws OperationEngineException
-     * @throws {Error} If this op to be upgraded is immutable
+     * another operation from the some site.
+     *
+     * @param op operation to include in the context of this operation
+     * @throws OperationEngineException If this op to be upgraded is immutable
      */
     public void upgradeContextTo(Operation op) throws OperationEngineException {
         if (this.immutable) {
@@ -495,98 +358,70 @@ public abstract class Operation implements Serializable {
     }
 
     /**
-     * Get the siteID
-     * 
-     * @return the siteID integer
+     * Return operation's siteID
      */
     public int getSiteId() {
         return this.siteId;
     }
 
     /**
-     * Get the type
-     * 
-     * @return the type
-     */
-    public String getType() {
-        return this.type;
-    }
-
-    /**
-     * Get the SeqID integer
-     * 
-     * @return seqID for this class
+     * Return operation's sequence ID
      */
     public int getSeqId() {
         return this.seqId;
     }
 
     /**
-     * Get the string of the operation value
-     * 
-     * @return string containing the vlaue
+     * Return operation's string value
      */
     public String getValue() {
         return this.value;
     }
 
     /**
-     * Get the integer of the offset position
-     * 
-     * @return int position
+     * Return operation's offset
      */
-    public int getPosition() {
-        return this.position;
+    public int getOffset() {
+        return this.offset;
     }
 
     /**
-     * Get the ContextVector associated with this operation
-     * 
-     * @return ContextVector
+     * Return operation's context vector
      */
     public ClientState getClientState() {
         return this.clientState;
     }
 
     /**
-     * Mutator that changes the immutable status
-     * 
-     * @param immutable
-     *            , requires to be a boolean mutates the immutable variable.
+     * Sets operation's immutability
      */
     public void setImmutable(boolean immutable) {
         this.immutable = immutable;
     }
 
     /**
-     * get the order of the operation
-     * 
-     * @return int order
+     * Return operation's ordering
      */
     public int getOrder() {
         return order;
     }
 
     /**
-     * set the order of the operation
-     * 
-     * @param order
+     * Sets the operation's ordering
      */
     public void setOrder(int order) {
         this.order = order;
     }
 
     /**
-     * Return the key value;
+     * Return document operation is made it
      */
     public String getKey() {
         return this.key;
     }
 
     /**
-     * sets the key value
-     * @param key
-     *            value to set to
+     * Sets the document key value
      */
     public void setKey(String key) {
         this.key = key;

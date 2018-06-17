@@ -74,7 +74,7 @@ public class ServerGui extends ClientGui {
 		collabModel = new CollabModel(textArea, collabServer);
 		// listen to change in the document
 		textArea.getDocument().addDocumentListener(
-				new TextChangeListener(this, collabModel));
+				new TextChangeListener(collabModel));
 		textArea.setEditable(false);
 
 		// add the controller here and add model to view

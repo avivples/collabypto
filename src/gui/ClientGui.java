@@ -4,8 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 
@@ -17,31 +15,23 @@ import javax.swing.GroupLayout.Alignment;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JMenuBar;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.JTextPane;
-import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.LayoutStyle;
 import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
-import javax.swing.UIManager;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 import javax.swing.text.StyledDocument;
-import javax.swing.text.StyledEditorKit;
 import javax.swing.undo.UndoManager;
 
 import server_client.CollabModel;
-import server_client.CollabClient;
 import server_client.CollabInterface;
 import controller.CaretListenerLabel;
 import controller.RedoAction;
@@ -49,274 +39,103 @@ import controller.TextChangeListener;
 import controller.UnDoAction;
 import document.OperationEngineException;
 
-/*Test Strategy:
- * Current client Gui support BOLD, ITALIC, UNDERLINE COPY, CUT, PASTE, so I have tested
- * all of those functions by observing the changes in the selected text when I perform
- * a click on those Button. If there is a selected text, the action will be carried out.
- * For BOLD,ITALIC, UNDERLINE if there is no selected text, it will change the font of the whole
- * document. BOLD, ITALIC, UNDERLINE currently support local changes only.
- *
- * COPY , CUT and PASTE don't do anything if there is nothing selected or nothing store
- * in the clipboard. The user can click on these three buttons or using the standard CTRL + C, CTRL +X, CTRL + PASTE
- * on selected text to perform the respective operation.
- *
- * UNDO and REDO will be tested by letting multiple user typing, and undo should perform the last action
- * of all of the users, same things will work for redo. It will generate CanUndoException in the console and
- * popup an error Dialog if there nothing to undo or redo, but it won't affect the documents in any way. There is
- * extra shortcut for UNDO (CTRL + Z) and REDO (CTRL + Y) if the user doesn't want to click.
- *
- * For resizing, all of the components are appropriately resizing after I expand the window.
- * The scrollPane in the Who is viewing using horizontal Wrap so if more users joining the documents, it will
- * add it in vertically, and user can scroll down to view all people.
- *
- * The Caret is shown at the bottom of the main documents and can be tested by move the UP, DOWN, LEFT, RIGHT or button click
- * and compare with different users for consistency.
- *
- * ScrollPane is automatically scrolling down when display area is full. The displayUser box also shows each user name
- * row by row and automatically scroll down if there is overflow in the displayUser box.
- * The clientGUI after the client connects to the server, it will display everything in the current state
- * of the server textArea and the current users in the chatroom/editing (not including the ChatArea),
- * this also get tested by connecting to the server mutliple time and observe the state of the GUI.
- *
- * The SrollPane that displays all of the current documents are also display and update when new user connects. This is tested
- * by creating multiple clients with multiple documents to see if the display is consistent across all users and servers
- *
- *
- * All of this procedure has to be thread-safe by performing the transform operation to all of the user/client pairs
- * For concurrency, the gui can be tested by doing the same procedure and observe if they're
- * reflected upon all users.
- *
- * The server will update its userLoginPanel whenever a client connects to it, this has been
- * tested by connected multiple clients to the server and its show the updated clients list in the userLoginPane.
- * When the user logs out, the server will reflect that in the userLoginPanel by removing the name as the specific
- * location. All of this changes will be view by both server and client.
- * The server will also update the list of documents if new documents are created and removed it from the view
- * if no one edits it any more. These features will be shown to all of the other clients.
- *
- * */
-
-/*
- * Design pattern
- * Client Gui, the main gui of the collaborative editing This implement the MVC
- * pattern where the view is what the user sees and can interact with (i.e The
- * Toolbar, main Document, who is viewing, list of documents), the model is
- * where those information should be store when there is some changes in the
- * view after the user interact with it. Some models that implement in these
- * design are DefaultListModel to control who views/edit the document,
- * DefaultStyleDocuments collabModel is the model for the collab edit main document which will
- * store the current state of the shared documents or separate documents),
- * the DefaultListModel listOfDocuments also stores the list of the documents
- * currently editing. The controllers are the buttons that listen to the changes
- * in the documents including all of the button in the tools bar, the carret listeners,
- * the DocumentsListener. The controller will have get and set method to call and
- * make changes on the view and the model appropriately. This makes the program
- * achieve modularity and seperate the concern on some of the components. We also
- * utilize the GUI internal Model for all of the JTextPane, JList so that we don't
- * need to reinvent the wheel and also store the model effectly without causing
- * too much Memory usage*/
-
 /**
- * The main GUI of the client and server (the server GUI is identical to
- * clientGUI due to internal design except the server can't edit the documents).
- * This GUI will pop up after getting enough information from the users about
- * the name,IP address, and port.
+ * The main GUI of the client and server. This GUI will pop off after the user
+ * enters his name, IP, port, and the document to edit.
  *
- * Thread-safety argument: This GUI is thread safe because the OT transform
- * won't rely on any thread running seperately from the clients. Also, this is
- * run on SwingUtilities.invokeLater thread which is Swing thread, so it won't
- * affect the main thread that handle the main logic of the program. All of its
- * listener also carried out in seperate Swing Thread to maintain the thread
- * safety.
- *
- * @author viettran
+ * This GUI is thread-safe because the OT algorithm is run separately on each client.
  *
  */
 public class ClientGui extends JPanel {
 
-    /**
-     *
-     */
     private static final long serialVersionUID = -2826617458739559881L;
-    /**
-     * The initial text of the document
-     */
-    private String init = "";
 
-    /**
-     * Main document of the collaborative editing
-     */
+    // Initial test of the document
+    private String init;
+    // Client's label
+    private final String label;
+
+    // Holds the document area
     protected JTextPane textArea;
-    /**
-     * toggle Bold Button to bold text
-     */
-    protected JToggleButton boldButton;
-    /**
-     * toggle Italic Button to italicize text
-     */
-    protected JToggleButton italicButton;
-    /**
-     * toggle Underline Button to underline text
-     */
-    protected JToggleButton underlineButton;
-
     protected JButton undoButton;
     protected JButton redoButton;
-    /**
-     * make copy of document
-     */
-    protected JButton copyButton;
-    /**
-     * paste the content in the clipboard
-     */
-    protected JButton pasteButton;
-    /**
-     * delete the content in the clipboard
-     */
-    protected JButton cutButton;
-    /**
-     * list of all of the users currently editing
-     */
-    protected JList userList;
-    /**
-     * the pane that whole the display of the list of users
-     */
-    protected JScrollPane chatScrollPane;
-    /**
-     * the pane to display the content of the chat
-     */
-    protected JTextArea chatDisplay;
 
-    /**
-     * the input of the chat
-     */
-    protected JTextField chatInput;
-    /**
-     * the pane that store the collab edit GUI
-     */
-    protected JPanel wholePane;
-    /**
-     * this Model control the user in userLogin Make it easy to add or remove
-     * Element
-     */
-    protected DefaultListModel listModel;
-    /**
-     * the model that store the current state of the Document
-     */
+    // Copy button
+    protected JButton copyButton;
+    // Paste button
+    protected JButton pasteButton;
+    // Cut Paste
+    protected JButton cutButton;
+    // Holds list of all users currently editing the document
+    protected JList userList;
+    // List all the documents the user has access to
+    protected JList documentList;
+
+    // Model to store the current state of hte document
     private CollabModel collabModel;
 
-    /**
-     * the client
-     */
-    private CollabClient collabClient;
-    /** the interface for both client and server */
-    // private CollabInterface collabInterface;
-
-    /**
-     * this Model control the documents in the program Make it easy to add or
-     * remove Element
-     */
+    protected JPanel wholePane;
+    protected DefaultListModel listModel;
     private DefaultListModel documentListModel;
 
     /**
-     * Label will be put on Client
+     * Create GUI for the client
      */
-    private final String label;
-    /**
-     * list of all of the documentss currently editing
-     */
-    protected JList documentList;
-
-    /**
-     * EditGui sets up the GUI for the local client
-     *
-     * @throws OperationEngineException
-     */
-    public ClientGui(String init, String label) throws OperationEngineException {
+    public ClientGui(String init, String label) {
         this.label = label;
         this.init = init;
         createGUI();
-
     }
 
     /**
-     * EditGui sets up the GUI for the local client
-     *
-     * @throws OperationEngineException
+     * Create GUI for the client
      */
-    public ClientGui(String init, CollabInterface cc, String label)
-            throws OperationEngineException {
+    public ClientGui(String init, CollabInterface cc, String label) throws OperationEngineException {
         this.label = label;
         this.init = init;
         // create the GUI for this user
         createGUI();
-        // create the model that take in the content of the textArea and a site
-        // id
-        collabClient = (CollabClient) cc;
+        // create the model that take in the content of the textArea and a site id
         collabModel = new CollabModel(textArea, cc);
         // listen to change in the document
-        textArea.getDocument().addDocumentListener(
-                new TextChangeListener(this, collabModel));
-
+        textArea.getDocument().addDocumentListener(new TextChangeListener(collabModel));
     }
 
     /**
-     * Created the initial GUI which is the same for both client and server it
-     * also adds all of the necessary listener to the appropriate components
-     * inside the GUI
+     * Created the initial GUI and add all of the necessary listeners
+     * to the appropriate components inside the GUI
      */
-    void createGUI() {
+    private void createGUI() {
 
         setLayout(new BorderLayout());
-
         FlowLayout toolBarLayout = new FlowLayout();
         toolBarLayout.setAlignment(FlowLayout.LEFT);
         JPanel toolBarPane = new JPanel();
 
-        // Create all of the buttons
+        // Create all of the buttonsw
 
-        // copy key
+        // copy button
         ImageIcon copy = new ImageIcon("raw/copy.png");
         copyButton = new JButton(copy);
         copyButton.setToolTipText("Copy Text");
-        copyButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                textArea.copy();
-
-            }
-        });
-        // paste key
+        copyButton.addActionListener(e -> textArea.copy());
+        // paste button
         ImageIcon paste = new ImageIcon("raw/paste.png");
         pasteButton = new JButton(paste);
         pasteButton.setToolTipText("Paste Text");
-        pasteButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                textArea.paste();
-
-            }
-        });
-
-        // cut key
+        pasteButton.addActionListener(e -> textArea.paste());
+        // cut button
         ImageIcon cut = new ImageIcon("raw/cut.png");
         cutButton = new JButton(cut);
         cutButton.setToolTipText("Cut Text");
-        cutButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                textArea.cut();
-            }
-        });
-
+        cutButton.addActionListener(e -> textArea.cut());
+        // undo button
         ImageIcon undo = new ImageIcon("raw/undo.png");
         undoButton = new JButton(undo);
-
+        // redo button
         ImageIcon redo = new ImageIcon("raw/redo.png");
-
         redoButton = new JButton(redo);
+
         JMenuBar toolBar = new JMenuBar();
 
         // add all button to toolBar
@@ -330,8 +149,7 @@ public class ClientGui extends JPanel {
 
         // Create a text area.
         textArea = createTextPane();
-        CaretListenerLabel caretLabelListener = new CaretListenerLabel(
-                "Caret Status:");
+        CaretListenerLabel caretLabelListener = new CaretListenerLabel("Caret Status:");
         textArea.addCaretListener(caretLabelListener);
 
         // carry out doing
@@ -350,8 +168,7 @@ public class ClientGui extends JPanel {
                 JComponent.WHEN_FOCUSED);
 
         JScrollPane areaScrollPane = new JScrollPane(textArea);
-        areaScrollPane
-                .setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        areaScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         areaScrollPane.setPreferredSize(new Dimension(500, 500));
         areaScrollPane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createCompoundBorder(
@@ -359,23 +176,21 @@ public class ClientGui extends JPanel {
                         BorderFactory.createEmptyBorder(5, 5, 5, 5)),
                 areaScrollPane.getBorder()));
 
-        userList = createUserLogin(new String[] { "No users right now" });
+        userList = createUserLogin(new String[] { "No users right now." });
         JScrollPane userLoginScrollPane = new JScrollPane(userList);
-        userLoginScrollPane
-                .setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        userLoginScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         userLoginScrollPane.setPreferredSize(new Dimension(120, 145));
         userLoginScrollPane.setMinimumSize(new Dimension(10, 10));
 
         // Create a chat display
-        JPanel documenAreaPane = new JPanel();
-        GroupLayout documentsListGroupLayout = new GroupLayout(documenAreaPane);
+        JPanel documentAreaPane = new JPanel();
+        GroupLayout documentsListGroupLayout = new GroupLayout(documentAreaPane);
 
         documentList = createDocumentsLogin(new String[] { "No documents right now" });
 
         JLabel documentsLabel = new JLabel("List of Documents");
         JScrollPane documentsListScrollPane = new JScrollPane(documentList);
-        userLoginScrollPane
-                .setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        userLoginScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         userLoginScrollPane.setPreferredSize(new Dimension(120, 145));
         userLoginScrollPane.setMinimumSize(new Dimension(10, 10));
 
@@ -389,17 +204,16 @@ public class ClientGui extends JPanel {
                 .addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(documentsLabel)
                 .addComponent(documentsListScrollPane));
-        documenAreaPane.setLayout(documentsListGroupLayout);
+        documentAreaPane.setLayout(documentsListGroupLayout);
 
         JPanel rightPane = new JPanel(new GridLayout(1, 0));
-        rightPane.add(documenAreaPane);
+        rightPane.add(documentAreaPane);
         rightPane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder("Who is viewing"),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));
 
         // Put everything together.
         JPanel leftPane = new JPanel(new BorderLayout());
-
         leftPane.add(toolBarPane, BorderLayout.PAGE_START);
         leftPane.add(areaScrollPane, BorderLayout.CENTER);
         leftPane.add(caretLabelListener, BorderLayout.SOUTH);
@@ -416,18 +230,15 @@ public class ClientGui extends JPanel {
     }
 
     /**
-     * Update the new list of user currently editting the document if there is
-     * people in the chat room, it will be replaced by by this new user lists
-     * Modifies listModel
+     * Update the new list of user currently editting the document.
      *
-     * @param objects
-     *            String of users' name
+     * @param names names of users
      *
      */
-    public void updateUsers(Object[] objects) {
+    public void updateUsers(Object[] names) {
         listModel.clear();
-        if (objects.length > 0) {
-            for (Object i : objects)
+        if (names.length > 0) {
+            for (Object i : names)
                 listModel.addElement(i);
         }
         wholePane.revalidate();
@@ -435,13 +246,8 @@ public class ClientGui extends JPanel {
     }
 
     /**
-     * Update the new list of user currently editting the document if there is
-     * people in the chat room, it will be replaced by by this new user lists
-     * Modifies listModel
-     *
-     * @param documents
-     *            String of users' name
-     *
+     * Update the new list of documents being editted
+     * @param documents String of documents
      */
     public void updateDocumentsList(Object[] documents) {
         documentListModel.clear();
@@ -455,9 +261,7 @@ public class ClientGui extends JPanel {
 
     /**
      * Returns a list of people of who are already logged in.
-     *
-     * @return JList holds the list of all the people modifies: listModel and
-     *         userList. Both will be initialize with this initial data
+     * @return JList
      */
     private JList createUserLogin(String[] initialData) {
         listModel = new DefaultListModel();
@@ -469,7 +273,6 @@ public class ClientGui extends JPanel {
         userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         return userList;
-
     }
 
     /**
@@ -493,14 +296,11 @@ public class ClientGui extends JPanel {
     }
 
     /**
-     * This creates the textArea where we can collab edit the document and add
-     * style to it, the intial font is just regular text
+     * This creates the textArea where we can edit the document
      *
-     * @return JTextPane, set to editable. the server probalbly should be
-     *         assigned to uneditable.
+     * @return JTextPane, set to editable
      */
     private JTextPane createTextPane() {
-
         JTextPane textPane = new JTextPane();
         StyledDocument doc = textPane.getStyledDocument();
         addStylesToDocument(doc);
@@ -515,23 +315,9 @@ public class ClientGui extends JPanel {
         return textPane;
     }
 
-    /**
-     *
-     * @return String content of the TextArea
-     */
-    public String getText() {
-        try {
-            return textArea.getDocument().getText(0,
-                    textArea.getDocument().getLength());
-        } catch (BadLocationException e) {
-            return "Yo Bad Luck";
-        }
-    }
-
-    protected void addStylesToDocument(StyledDocument doc) {
+    private void addStylesToDocument(StyledDocument doc) {
         // Initialize some styles.
-        Style def = StyleContext.getDefaultStyleContext().getStyle(
-                StyleContext.DEFAULT_STYLE);
+        Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
 
         Style regular = doc.addStyle("regular", def);
         StyleConstants.setFontFamily(def, "SansSerif");
@@ -553,54 +339,22 @@ public class ClientGui extends JPanel {
 
         s = doc.addStyle("button", regular);
         StyleConstants.setAlignment(s, StyleConstants.ALIGN_CENTER);
-
     }
 
     /**
      * Get the model of this client
-     *
      * @return CollabModel
      */
     public CollabModel getCollabModel() {
         return this.collabModel;
     }
 
-    /**
-     * Create the GUI and show it. For thread safety, this method should be
-     * invoked from the event dispatch thread.
-     *
-     * @throws OperationEngineException
-     */
-    private static void createAndShowGUI() throws OperationEngineException {
-        // Create and set up the window.
-        JFrame frame = new JFrame("Collabypto");
-        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-
-        // Add content to the window.
-        frame.add(new ClientGui("Welcome to Collabypto!", "Client"));
-
-        // Display the window.
-        frame.pack();
-        frame.setVisible(true);
-    }
 
     /**
      * This will access the CollabModel and set the document key
-     *
-     * @param str
+     * @param str key
      */
     public void setModelKey(String str) {
         this.collabModel.setKey(str);
-    }
-
-    // true - let client edit
-    // false - stop client from editing
-    public void newUser(boolean cont) {
-        textArea.setEditable(cont);
-        copyButton.setEnabled(cont);
-        cutButton.setEnabled(cont);
-        pasteButton.setEnabled(cont);
-        undoButton.setEnabled(cont);
-        redoButton.setEnabled(cont);
     }
 }
