@@ -17,6 +17,8 @@ import document.Operation;
 import document.OperationEngine;
 import document.OperationEngineException;
 
+import server_client.CollabClient.ENCRYPTION_METHOD;
+
 /**
  * to Hold the main Document of the Collab edit, might implement on top of gap
  * buffer
@@ -103,20 +105,17 @@ public class CollabModel extends DefaultStyledDocument {
      * @param text
      *            , requires to be valid text. This is the text to be inserted
      *            into the buffer
-
-     * @param styleOfText
-     *            , requires to be normal for now. This is the style of the text
-     *            being modified
+     *
      * @throws OperationEngineException
      */
-    public void addString(int offset, String text, AttributeSet styleOfText)
+    public void addString(int offset, String text)
             throws OperationEngineException {
         int[] temp = new int[0];
         Operation top = oe.push(true, OPKEY, text, INSERT, offset, siteID, temp, 0);
         // buffer.insert(offset, text);
         if (collab != null) {
             try {
-                collab.transmit(top);
+                collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -136,18 +135,15 @@ public class CollabModel extends DefaultStyledDocument {
      * @param siteID      , requires to be a valid siteID, otherwise ContextVector will
      *                    be wrong. This is the identification number of the siteID
      *                    originating this operation
-     * @param styleOfText , requires to be normal for now. This is the style of the text
-     *                    being modified
      * @throws OperationEngineException
      */
-    public Operation insertString(int offset, String text, int siteID,
-                                  AttributeSet styleOfText) throws OperationEngineException {
+    public Operation insertString(int offset, String text, int siteID) throws OperationEngineException {
         int[] temp = new int[0];
         Operation top = oe.push(true, OPKEY, text, INSERT, offset, siteID, temp, 0);
         // buffer.insert(offset, text);
         if (collab != null) {
             try {
-                collab.transmit(top);
+                collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -164,7 +160,7 @@ public class CollabModel extends DefaultStyledDocument {
      * <p>
      * NEED TO ADD PARAMS (THEIRS WAS WRONG) @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
      */
-    public void deleteString(int offset, int length, AttributeSet styleOfText)
+    public void deleteString(int offset, int length)
             throws OperationEngineException {
         int[] temp = new int[0];
         StringBuilder sb = new StringBuilder();
@@ -176,7 +172,7 @@ public class CollabModel extends DefaultStyledDocument {
         // buffer.delete(offset, offset+length);
         if (collab != null) {
             try {
-                collab.transmit(top);
+                collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -209,7 +205,7 @@ public class CollabModel extends DefaultStyledDocument {
                 SwingUtilities.invokeAndWait(new Runnable() {
                     public void run() {
                         mainDocument.setEditable(false);
-                        int offset = top.getPosition();
+                        int offset = top.getOffset();
                         String value = top.getValue();
 
                         AttributeSet temp = new SimpleAttributeSet();

@@ -4,6 +4,8 @@ import document.Operation;
 
 import java.io.IOException;
 
+import server_client.CollabClient.ENCRYPTION_METHOD;
+
 /**
  * The interface for the CollabClient and CollabServer.
  * @author youyanggu
@@ -35,6 +37,8 @@ public interface CollabInterface {
      * @throws IOException 
      */
     public void transmit(Object op) throws IOException;
+
+    public void transmit(Object o, ENCRYPTION_METHOD encryption) throws IOException;
 
     /**
      * Updates the copy of the document using operational transform

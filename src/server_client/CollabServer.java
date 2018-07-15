@@ -7,18 +7,27 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.sql.Array;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Set;
+import java.util.*;
 
+import javax.crypto.SealedObject;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 import javax.swing.JFrame;
 import javax.swing.text.BadLocationException;
 
+
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
+import signal.EncryptedMessage;
+import signal.RegistrationInfo;
+import signal.SessionInfo;
 
 /**
  *
@@ -78,32 +87,40 @@ public class CollabServer implements CollabInterface {
      */
     private int order;
     /**
-     * Data structure to keep track of clients
+     * Associates a user with a socket. Boolean for if its active.
      */
-    private final ArrayList<Pair<String, Pair<Socket, Boolean>>> clientSockets = new ArrayList<>();
+    private final HashMap<String, Pair<Socket, Boolean>> clientSockets = new HashMap<>();
+
+
 
     /**
      * A hash of socket to its associated input/output streams. We want to use these
      * two streams each time we need to communicate between a particular client and the server
      */
-    private final HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>> socketStreams = new HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>>();
+    private final HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>> socketStreams = new HashMap<>();
+
+    //stores the registration info for each users
+    private HashMap<String, RegistrationInfo> clientRegistrationInfo =  new HashMap<>();
+
+    //stores sessioninfoss that are yet to be sent per user.
+    private HashMap<String, List<SessionInfo>> clientSessions = new HashMap<>();
 
     /**
      * List of all users
      */
-    private final ArrayList<String> usernames = new ArrayList<String>();
+    private final ArrayList<String> usernames = new ArrayList<>();
 
 
     // TODO: Change documents to be a map from ID to string + history. REMOVE THIS
     /**
      * List of all documents
      */
-    private final HashMap<String, ServerGui> documents = new HashMap<String, ServerGui>();
+    private final HashMap<String, ServerGui> documents = new HashMap<>();
 
     // TODO: Put history and documentInstance for every doc. For only one for testing
     private HashMap<String, String[]> clientLists = new HashMap<>();
-    private HashMap<String, ArrayList<Object>> histories = new HashMap<String, ArrayList<Object>>();
-    private HashMap<String, DocumentInstance> documentInstances = new HashMap<String, DocumentInstance>();
+    private HashMap<String, ArrayList<Object>> histories = new HashMap<>();
+    private HashMap<String, DocumentInstance> documentInstances = new HashMap<>();
 //    private int accept = 0;
 
     /**
@@ -127,24 +144,9 @@ public class CollabServer implements CollabInterface {
                     + ", port: " + this.port);
             return;
         }
-        // Add default document to document list
-//        try {
-//            documents.put(DEFAULT_DOC_NAME,
-//                    new ServerGui(this, this.serverName));
-//            // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
-//            documentInstance = new DocumentInstance(documents.get(DEFAULT_DOC_NAME).getText(),
-//                    documents.get(DEFAULT_DOC_NAME).getCollabModel().copyOfCV());
-//        } catch (OperationEngineException e) {
-//            e.printStackTrace();
-//        }
-        // Update document list, set the current display GUI to be the default document
-//        this.displayGui = documents.get(DEFAULT_DOC_NAME);
-//        ArrayList<String> docs = new ArrayList<String>();
-//        docs.addAll(documents.keySet());
-//        this.displayGui.updateDocumentsList(docs.toArray());
 
         // The server is viewed as the zeroth socket
-        clientSockets.add(null);
+        clientSockets.put(null, null);
         System.out.println("Server created.");
     }
 
@@ -232,17 +234,22 @@ public class CollabServer implements CollabInterface {
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
         // Add stream to HashMap
-        socketStreams.put(socket, new Pair<ObjectInputStream, ObjectOutputStream>(in, out));
+        socketStreams.put(socket, new Pair<>(in, out));
 
         try {
             Object input;
-            //waits for client to write his name
+            //waits for client to write his name and saves it along with registration info of the user
             input = in.readObject();
-            if (input instanceof String) {
-                clientName = (String) input;
-            } else {
+            if (input instanceof Pair) {
+                Pair p = (Pair) input;
+                clientName = (String) p.first;
+
+                clientRegistrationInfo.put(clientName, (RegistrationInfo) p.second);
+            }
+            else {
                 throw new IOException("Expected client name");
             }
+
             //Stays here waiting for the user to choose a document. (his other option is pressing F5)
             while(true) {
                 // Sends list of documents to client
@@ -262,17 +269,37 @@ public class CollabServer implements CollabInterface {
 
             synchronized (lock) {
                 // If document does not exist, create it
-
                 // TODO: client crashes if you use an existing document name. Maybe fix
                 documentID = (String) input;
+                //if new document
                 if (!documents.containsKey(documentID)) {
-
-                    // TODO: REMOVE THIS WHEN WE GET RID OF DEFAULT
                     documentInstances.put(documentID, new DocumentInstance(""));
                     input = in.readObject();
                     if (input instanceof String[]) {
+                        String[] clientList = (String[]) input;
                         clientLists.put(documentID, (String[]) input);
-                    } else {
+
+                        //build sessioninfo for document creator with the rest of the users. Assumes everyone is registered.
+                        for(String client : clientList) {
+                            clientSessions.put(client, new ArrayList<>());
+                        }
+
+                        for(String client : clientList) {
+                            if(clientRegistrationInfo.get(client) == null) {
+                                throw new IllegalArgumentException("Client in list does not exist. Add error checking to handle this instead of an exception later.");
+                            }
+                            RegistrationInfo registrationInfo = clientRegistrationInfo.get(client);
+                            for(String otherClient : clientList) {
+                                if(otherClient.equals(client)) continue;
+                                SessionInfo session = registrationInfo.createSessionInfo(client, documentID); //TODO: CHECK
+                                clientSessions.get(otherClient).add(session);
+                                //TODO: functionality if user is not online when session is created
+                            }
+                            //if this is the creator of the document, send him the sessions now. Else, store them.
+                        }
+                        //TODO: remove sessions when user joins and builds them so he doesnt build multiple times
+                    }
+                    else {
                         throw new IOException("Expected client list");
                     }
 
@@ -283,9 +310,12 @@ public class CollabServer implements CollabInterface {
                 }
                 this.users++;
                 // Add to ArrayList of sockets
-                clientSockets.add(new Pair(clientName, new Pair(socket, true)));
+                clientSockets.put(clientName, new Pair(socket, true));
                 // sets client ID
                 clientID = clientSockets.size() - 1;
+
+                out.writeObject(clientSessions.get(clientName));
+
             }
 
 //            if (!documents.containsKey(documentID)) {
@@ -298,8 +328,9 @@ public class CollabServer implements CollabInterface {
 
             //if this is a new document, create a new empty history list.
             if(histories.get(documentID) == null) {
-                histories.put(documentID, new ArrayList<Object>());
+                histories.put(documentID, new ArrayList<>());
             }
+            //TODO: SUPPORT FOR ENCRYPTED HISTORY
             //send the client the history of the document.
             out.writeObject(new Pair(documentInstances.get(documentID), histories.get(documentID)));
             out.flush();
@@ -343,7 +374,7 @@ public class CollabServer implements CollabInterface {
             synchronized (lock) {
                 try {
                     // set client as inactive
-                    clientSockets.get(clientID).second.second = false;
+                    clientSockets.get(clientID).second = false;
                     this.users--;
                     usernames.remove(clientName);
                     // need to update the view of who still in the edit room
@@ -386,13 +417,7 @@ public class CollabServer implements CollabInterface {
      *                     connection breaks
      */
     public void parseInput(Object input, String documentID, int clientID) throws IOException {
-        // TODO: remove casting when we encrypt
-        if (input instanceof Operation) {
-            // send update to all other clients
-            transmit((Operation) input, documentID); // also mutates the input
-        } else {
-            throw new RuntimeException("Unrecognized object type");
-        }
+        transmit(input, documentID); // also mutates the input
     }
 
 
@@ -405,38 +430,7 @@ public class CollabServer implements CollabInterface {
      */
     @Override
     public void updateDoc(Operation o) {
-        // TODO: remove this function
-        // Gets the document to apply the operation to
-        String documentID = o.getKey();
-        try {
-            if (o instanceof InsertOperation) {
-                ServerGui current = documents.get(documentID);
-                if (current == null) {
-                    o.setKey("Insert tested");
-                    return;
-                }
-                current.setModelKey(documentID);
-                current.getCollabModel().remoteOp(o, true); // insert operation
-                current.getTextArea().setEditable(false);
 
-            } else if (o instanceof DeleteOperation) {
-                ServerGui current = documents.get(documentID);
-                if (current == null) {
-                    o.setKey("Delete tested");
-                    return;
-                }
-                current.setModelKey(documentID);
-                current.getCollabModel().remoteOp(o, false); // delete operation
-                current.getTextArea().setEditable(false);
-            } else {
-                throw new RuntimeException("Shouldn't reach here");
-            }
-
-        } catch (OperationEngineException e) {
-            e.printStackTrace();
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
     }
 
 
@@ -448,53 +442,51 @@ public class CollabServer implements CollabInterface {
      * @throws IOException if the input/output stream is corrupt
      */
     public void transmit(Object o, String documentID) throws IOException {
-        // TODO: change the operation to an object that will be encrypted
-        ObjectOutputStream out = null;
+        ObjectOutputStream out;
         // Increment the order so the Operation Engine can determine
         // the relative position of all the operations
-        Pair<Object, Integer> delivery;
+        EncryptedMessage[] messages = (EncryptedMessage[]) o;
         synchronized (lock) {
-            histories.get(documentID).add(o);
-            delivery = new Pair<>(o, order);
+            //histories.get(documentID).add(o); //TODO: change when history changes
+            //delivery = new Pair<>(o, order);
+            for(int i = 0; i < messages.length; i++) {
+                messages[i].setOrder(order);
+            }
             order++;
         }
 
-        // send operation to each one of the clients
-        for (int i = 1; i < clientSockets.size(); i++) {
-            Pair<Socket, Boolean> p = clientSockets.get(i).second;
+        for(int i = 0; i < messages.length; i++) {
+            EncryptedMessage message = messages[i];
+            Pair<Socket, Boolean> p = clientSockets.get(message.recipientID);
+            Socket currentSocket = p.first;
+            Boolean activeSocket = p.second;
+            if (!activeSocket) {
+                //TODO: add to history
+                continue;
+            }
+            out = socketStreams.get(currentSocket).second;
+            out.writeObject(message);
+            out.flush();
+        }
+
+/*        // send operation to each one of the clients
+        for (String clientName : clientSockets.keySet()) {
+            if(clientName == null) continue; //do not send to server
+            Pair<Socket, Boolean> p = clientSockets.get(clientName);
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
             // Connection is already closed, or this is the operation that was
             // originally sent by that client. So we don't send.
-            if (!activeSocket) continue;
+            if (!activeSocket) {
+                continue;
+            }
 
             // Otherwise we send the operation
             out = socketStreams.get(currentSocket).second;
             out.writeObject(delivery);
             out.flush();
-        }
-    }
-
-    //Transmits to all except given socket, currently unused (was used in an attempt to sync during new user joining to prevent crashes)
-    public void transmitAllButOne(Object o, Socket s) throws IOException {
-        // TODO: change the operation to an object that will be encrypted
-        ObjectOutputStream out = null;
-
-        // send operation to each one of the clients
-        for (int i = 1; i < clientSockets.size(); i++) {
-            Pair<Socket, Boolean> p = clientSockets.get(i).second;
-            Socket currentSocket = p.first;
-            Boolean activeSocket = p.second;
-
-            // Connection is already closed
-            if (!activeSocket || currentSocket == s) continue;
-
-            // Otherwise we send the operation
-            out = socketStreams.get(currentSocket).second;
-            out.writeObject(o);
-            out.flush();
-        }
+        }*/
     }
 
     /**
@@ -514,9 +506,10 @@ public class CollabServer implements CollabInterface {
 //        this.displayGui.updateDocumentsList(docs.toArray());
 
         // For each client
-        for (int i = 1; i < clientSockets.size(); i++) {
+        for (String clientName : clientSockets.keySet()) {
+            if(clientName == null) continue;
             // retrieve the sockets for the client
-            Pair<Socket, Boolean> p = clientSockets.get(i).second;
+            Pair<Socket, Boolean> p = clientSockets.get(clientName);
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
@@ -531,7 +524,7 @@ public class CollabServer implements CollabInterface {
             // Creates a cloned pair of usernames and documents
             Pair<ArrayList<String>, ArrayList<String>> pair = new Pair<>(
                     (ArrayList<String>) usernames.clone(),
-                     filteredList(clientSockets.get(i).first));
+                     filteredList(clientName));
 
             // Sends it to the client
             out.writeObject(pair);
@@ -576,6 +569,11 @@ public class CollabServer implements CollabInterface {
     @Override
     public void transmit(Object op) throws IOException {
         //We have no use for this because I changed how transmit works (and we will need to change it again later for pairwise encryption) but the interface demands this
+    }
+
+    @Override
+    public void transmit(Object o, CollabClient.ENCRYPTION_METHOD encryption) throws IOException {
+        //used only for client, bad structure
     }
 
     /**

@@ -2,13 +2,18 @@ package gui;
 
 import server_client.CollabClient;
 
+import javax.crypto.NoSuchPaddingException;
 import javax.swing.*;
 import javax.swing.GroupLayout.Alignment;
+import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -41,6 +46,7 @@ public class DocumentSelectionPage extends JFrame {
 	 */
 	public DocumentSelectionPage(ArrayList<String> documents, final CollabClient client) {
 		Collections.sort(documents);
+		//TODO: Add the user's name as the frame's title
 		JPanel mainPanel = new JPanel();
 		mainPanel.grabFocus();
 		//creates an action that refreshes the document list, and binds it to F5.
@@ -128,7 +134,17 @@ public class DocumentSelectionPage extends JFrame {
 					clientList[clientList.length - 1] = client.getUsername();
 					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
-					client.setClientList(clientList);
+					try {
+						client.setCipher();
+					} catch (NoSuchPaddingException e) {
+						e.printStackTrace();
+					} catch (NoSuchAlgorithmException e) {
+						e.printStackTrace();
+					} catch (InvalidKeyException e) {
+						e.printStackTrace();
+					} catch (InvalidAlgorithmParameterException e) {
+						e.printStackTrace();
+					}
 					try {
 						//give the document name and client list to the server.
 						client.transmit(documentInput.getText());
@@ -158,7 +174,6 @@ public class DocumentSelectionPage extends JFrame {
 		setDefaultCloseOperation(EXIT_ON_CLOSE);
 		setResizable(false);
 		setVisible(true);
-
 	}
 
 	private void updateDocumentsList(Object[] documents) {
