@@ -60,7 +60,7 @@ public class CollabClient implements CollabInterface {
     /** Timeout on socket connection attempts */
     private static final int TIMEOUT = 2000;
     /** unique to each client. Used to differentiate operations */
-	private int siteID;
+	private int siteID = -1;
 	/** document the client is editing */
 	private String document = "";
 	/** list of clients current doc is shared with */
@@ -287,7 +287,7 @@ public class CollabClient implements CollabInterface {
 			    //we got history and documentinstance from the server, so update this user to the current state using the history.
 				DocumentInstance documentInstance = (DocumentInstance) plaintext;
 				String text = documentInstance.document;
-				ArrayList<Operation> history = (ArrayList) p.second;
+				ArrayList<EncryptedMessage> history = (ArrayList) p.second;
 				if (history.size() > 0) {
 					text = updateFromHistory(history, text);
 				}
@@ -308,7 +308,14 @@ public class CollabClient implements CollabInterface {
 
 				// Updates the ContextVector of the GUI with the one sent by the server. We use the context vector of the last operation.
 				if (history.size() > 0) {
-					Operation lastOp = history.get(history.size() - 1);
+					Operation lastOp = null;
+					try {
+						lastOp = decrypt(history.get(history.size() - 1));
+					}
+					catch (Exception e) {
+						e.printStackTrace();
+					}
+
 					ClientState cV = lastOp.getClientState();
 					gui.getCollabModel().setCV(cV);
 					lastOp.setOrder(history.size() - 1);
@@ -320,7 +327,11 @@ public class CollabClient implements CollabInterface {
 			try {
 				EncryptedMessage message = (EncryptedMessage) o;
 				Operation op = decrypt(message);
-				if (getID() == op.getSiteId()) return; //shouldn't happen when server sends to specific users
+				if (getID() == op.getSiteId()) {
+					System.out.println("site ID is the same " + getID());
+					return; //shouldn't happen when server sends to specific users
+				}
+				System.out.println(getUsername() + " Got message from " + message.senderID + " for " + message.recipientID);
 				op.setOrder(message.order);
 				updateDoc(op);
 			}
@@ -330,9 +341,12 @@ public class CollabClient implements CollabInterface {
 		}
         else if (o instanceof Integer) {
             // The server is sending the unique client identifiers
+			if(siteID != -1) return; //siteID is already set
             this.siteID = ((Integer) o).intValue();
-            if (this.name.equals("Anonymous"))
-                this.name += "" + this.siteID;
+            if (this.name.equals("Anonymous")) {
+				this.name += "" + this.siteID;
+			}
+			//TODO: we shouldn't be writing/reading the username twice but removing it seems to make the client/document list disappear. Fix
             out.writeObject(this.name);
             out.flush();
             label = this.name + " is editing document: " + this.document;
@@ -401,7 +415,7 @@ public class CollabClient implements CollabInterface {
 		return plaintext;
 	}
 
-	private Operation decrypt(EncryptedMessage signalMessage) throws NoSessionException, DuplicateMessageException, InvalidMessageException, UntrustedIdentityException, LegacyMessageException, InvalidVersionException, InvalidKeyException, InvalidKeyIdException {
+	private Operation decrypt(EncryptedMessage signalMessage) throws DuplicateMessageException, InvalidMessageException, UntrustedIdentityException, LegacyMessageException, InvalidVersionException, InvalidKeyException, InvalidKeyIdException {
 		Class<?>[] classes = new Class[] {InsertOperation.class, DeleteOperation.class,  Operation.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
@@ -461,14 +475,23 @@ public class CollabClient implements CollabInterface {
 	}
 
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
-	public String updateFromHistory(ArrayList<Operation> history, String text) throws OperationEngineException {
+	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
 		StringBuilder doc = new StringBuilder();
 		System.err.println(history.size());
+		Operation[] operations = new Operation[history.size()];
+		int i = 0;
+		for(EncryptedMessage message : history) {
+			try {
+				if(i != operations.length - 1) operations[i] = decrypt(message);
+				i++;
+			}
+			catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 		try {
 			doc.append(text);
-			Operation[] operations = history.toArray(new Operation[history.size()]);
-
-			for (int i = 0; i < history.size() - 1; i++) {
+			for (i = 0; i < operations.length - 1; i++) {
 					Operation op = operations[i];
 					op.setOrder(i);
 				if (op.getKey().equals(document)) {
@@ -479,7 +502,8 @@ public class CollabClient implements CollabInterface {
 					}
 				}
 			}
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			e.printStackTrace();
 		}
 		return doc.toString();
@@ -538,7 +562,7 @@ public class CollabClient implements CollabInterface {
 			return null;
 		}
 		if(!(o instanceof ArrayList)) {
-			throw new SocketException("Expected documents list");
+			throw new SocketException("Expected documents list, got " + o.getClass());
 		}
 		ArrayList<String> documentsList = (ArrayList<String>) o;
 		return documentsList.toArray();

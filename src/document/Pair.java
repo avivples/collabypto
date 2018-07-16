@@ -15,7 +15,7 @@ public class Pair<X, Y> implements Serializable {
     public Y second;
 
     public Pair(X first, Y second) {
-        if (first == null || second == null) throw new NullPointerException();
+       // if (first == null || second == null) throw new NullPointerException();
         this.first = first;
         this.second = second;
     }
