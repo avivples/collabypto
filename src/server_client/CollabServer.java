@@ -89,7 +89,6 @@ public class CollabServer implements CollabInterface {
     /**
      * Associates a user with a socket. Boolean for if its active.
      */
-    private HashMap<String, Pair<Socket, Boolean>> clientSockets = new HashMap<>();
 
     int clientID = 0; //TODO: look for other alternatives for this
 
@@ -99,11 +98,6 @@ public class CollabServer implements CollabInterface {
      */
     private HashMap<Socket, Pair<ObjectInputStream, ObjectOutputStream>> socketStreams = new HashMap<>();
 
-    //stores the registration info for each users
-    private HashMap<String, RegistrationInfo> clientRegistrationInfo =  new HashMap<>();
-
-    //stores sessioninfos that are yet to be sent per user.
-    private HashMap<String, List<SessionInfo>> clientSessions = new HashMap<>();
 
     /**
      * List of all users
@@ -121,9 +115,9 @@ public class CollabServer implements CollabInterface {
     private HashMap<String, String[]> clientLists = new HashMap<>();
     //private HashMap<String, ArrayList<Object>> histories = new HashMap<>();
     private HashMap<String, DocumentInstance> documentInstances = new HashMap<>();
-    private HashMap<String, String> clientCurrentDocument = new HashMap<>();
-    private HashMap<Pair<String, String>, ArrayList<EncryptedMessage>> histories = new HashMap<>();
 //    private int accept = 0;
+
+    private HashMap<String, UserInfo> clientInfos = new HashMap<>();
 
     /**
      * Constructor for making a server. It will set the port number, create a
@@ -147,8 +141,10 @@ public class CollabServer implements CollabInterface {
             return;
         }
 
+        // TODO: probably delete if no issues arise
         // The server is viewed as the zeroth socket
-        clientSockets.put(null, null);
+//        clientSockets.put(null, null);
+
         System.out.println("Server created.");
     }
 
@@ -237,6 +233,8 @@ public class CollabServer implements CollabInterface {
         // Add stream to HashMap
         socketStreams.put(socket, new Pair<>(in, out));
 
+        UserInfo clientInfo = new UserInfo();
+
         try {
             Object input;
             //waits for client to write his name and saves it along with registration info of the user
@@ -244,8 +242,8 @@ public class CollabServer implements CollabInterface {
             if (input instanceof Pair) {
                 Pair p = (Pair) input;
                 clientName = (String) p.first;
-
-                clientRegistrationInfo.put(clientName, (RegistrationInfo) p.second);
+                clientInfos.put(clientName, clientInfo);
+                clientInfo.registrationInfo = (RegistrationInfo) p.second;
             }
             else {
                 throw new IOException("Expected client name");
@@ -253,10 +251,9 @@ public class CollabServer implements CollabInterface {
 
             //Stays here waiting for the user to choose a document. (his other option is pressing F5)
             while(true) {
-                clientCurrentDocument.put(clientName, "");
-
+                clientInfo.currentDocument = "";
                 // Sends list of documents to client
-                ArrayList<String> clientDocuments = filteredList(clientName);
+                ArrayList<String> clientDocuments = filteredDocumentList(clientName);
                 out.writeObject(clientDocuments);
                 out.flush();
 
@@ -271,11 +268,10 @@ public class CollabServer implements CollabInterface {
             }
 
             synchronized (lock) {
-                // If document does not exist, create it
                 // TODO: client crashes if you use an existing document name. Maybe fix
                 documentID = (String) input;
-                clientCurrentDocument.put(clientName, documentID);
-                //if new document
+                clientInfo.currentDocument = documentID;
+                // If document does not exist, create it
                 if (!documents.containsKey(documentID)) {
                     documentInstances.put(documentID, new DocumentInstance(""));
                     input = in.readObject();
@@ -285,21 +281,24 @@ public class CollabServer implements CollabInterface {
 
                         //build sessioninfo for document creator with the rest of the users. Assumes everyone is registered.
                         for(String client : clientList) {
-                            clientSessions.put(client, new ArrayList<>());
-                            histories.put(new Pair<>(client, documentID), new ArrayList<>());
-                            if(clientSockets.get(client) == null) clientSockets.put(client, new Pair(null, false)); //don't know the client's socket yet
+                            System.out.println(client);
+                            UserInfo curUser = clientInfos.get(client);
+                            System.out.println(curUser == null);
+                            curUser.histories.put(documentID, new ArrayList<>());
+                            if(curUser.socket == null) curUser.socket = new Pair(null, false); //don't know the client's socket yet
                         }
 
                         for(String client : clientList) {
-                            if(clientRegistrationInfo.get(client) == null) {
+                            if(clientInfos.get(client).registrationInfo == null) {
                                 throw new IllegalArgumentException("Client in list does not exist. Add error checking to handle this instead of an exception later.");
                             }
-                            RegistrationInfo registrationInfo = clientRegistrationInfo.get(client);
+                            UserInfo curUser = clientInfos.get(client);
+                            RegistrationInfo registrationInfo = curUser.registrationInfo;
+
                             for(String otherClient : clientList) {
                                 if(otherClient.equals(client)) continue;
                                 SessionInfo session = registrationInfo.createSessionInfo(client, documentID); //TODO: CHECK
-                                clientSessions.get(otherClient).add(session);
-                                //TODO: functionality if user is not online when session is created
+                                clientInfos.get(otherClient).sessionInfos.add(session);
                             }
                             //if this is the creator of the document, send him the sessions now. Else, store them.
                         }
@@ -316,8 +315,8 @@ public class CollabServer implements CollabInterface {
                 }
                 this.users++;
                 //set user as joined and associate with his socket
-                clientSockets.put(clientName, new Pair(socket, true));
-                System.out.println("clientsockets " + clientName + " activesocket is now " + clientSockets.get(clientName).second);
+                // TODO: move this to the correct place without breaking everything
+                clientInfo.socket = new Pair<>(socket, true);
 
                 // sets client ID
                 clientID++;
@@ -327,8 +326,8 @@ public class CollabServer implements CollabInterface {
 //                throw new RuntimeException("Missing document ID in map");
 //            }
             out.writeObject(clientID);
-            out.flush();  //TODO: CHECK THAT THIS CAN BE OUTSIDE THE LOCK
-            out.writeObject(clientSessions.get(clientName));
+            out.flush();
+            out.writeObject(clientInfos.get(clientName).sessionInfos);
             out.flush();
             // Sends to client the client ID
 
@@ -336,10 +335,10 @@ public class CollabServer implements CollabInterface {
             Pair<String, String> pair = new Pair<>(clientName, documentID);
 
             //send the client the history of the document.
-            out.writeObject(new Pair(documentInstances.get(documentID), histories.get(pair)));
+            out.writeObject(new Pair(documentInstances.get(documentID), clientInfo.histories.get(documentID)));
             out.flush();
 
-            histories.get(pair).clear();
+            clientInfo.histories.get(documentID).clear();
 
             // Receives username of client. Updates users.
             input = in.readObject();
@@ -351,7 +350,6 @@ public class CollabServer implements CollabInterface {
                 usernames.add(clientName);
             }
             updateUsers();
-
             // Receives operations from client. That's all the server is
             // expecting from
             // the client from now on.
@@ -378,8 +376,8 @@ public class CollabServer implements CollabInterface {
             synchronized (lock) {
                 try {
                     // set client as inactive
-                    clientSockets.get(clientID).second = false;
-                    clientCurrentDocument.put(clientName, ""); //TODO: fix it so it updates
+                    clientInfo.socket.second = false;
+                    clientInfo.currentDocument = "";
                     this.users--;
                     usernames.remove(clientName);
                     // need to update the view of who still in the edit room
@@ -396,7 +394,7 @@ public class CollabServer implements CollabInterface {
     }
 
     //Returns a list of all documents given client has authorization to see
-    public ArrayList<String> filteredList (String clientName) {
+    private ArrayList<String> filteredDocumentList (String clientName) {
         ArrayList<String> clientDocuments = new ArrayList<>();
         for (String document : documents.keySet()) {
             String[] clientList = clientLists.get(document);
@@ -451,8 +449,6 @@ public class CollabServer implements CollabInterface {
         // the relative position of all the operations
         EncryptedMessage[] messages = (EncryptedMessage[]) o;
         synchronized (lock) {
-            //histories.get(documentID).add(o); //TODO: change when history changes
-            //delivery = new Pair<>(o, order);
             for(int i = 0; i < messages.length; i++) {
                 messages[i].setOrder(order);
             }
@@ -461,11 +457,11 @@ public class CollabServer implements CollabInterface {
 
         for(int i = 0; i < messages.length; i++) {
             EncryptedMessage message = messages[i];
-            Pair<Socket, Boolean> p = clientSockets.get(message.recipientID);
+            UserInfo recipientInfo = clientInfos.get(message.recipientID);
+            Pair<Socket, Boolean> p = recipientInfo.socket;
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
-            if (clientCurrentDocument.get(message.recipientID).equals(documentID)) {
-                System.out.println(documentID + " " + clientCurrentDocument.get(message.recipientID));
+            if (recipientInfo.currentDocument.equals(documentID)) {
                 System.out.println("Sent message from " + message.senderID + " to " + message.recipientID);
                 out = socketStreams.get(currentSocket).second;
                 out.writeObject(message);
@@ -473,32 +469,10 @@ public class CollabServer implements CollabInterface {
             }
             else {
                 System.out.println("message from " + message.senderID + " to " + message.recipientID + " added to history");
-                System.out.println(!activeSocket);
                 //TODO: fix clientsockets so it updates activesocket correctly
-                System.out.println(!clientCurrentDocument.get(message.recipientID).equals(documentID));
-                Pair<String, String> pair = new Pair<>(message.recipientID, documentID);
-                histories.get(pair).add(message);
+                recipientInfo.histories.get(documentID).add(message);
             }
         }
-
-/*        // send operation to each one of the clients
-        for (String clientName : clientSockets.keySet()) {
-            if(clientName == null) continue; //do not send to server
-            Pair<Socket, Boolean> p = clientSockets.get(clientName);
-            Socket currentSocket = p.first;
-            Boolean activeSocket = p.second;
-
-            // Connection is already closed, or this is the operation that was
-            // originally sent by that client. So we don't send.
-            if (!activeSocket) {
-                continue;
-            }
-
-            // Otherwise we send the operation
-            out = socketStreams.get(currentSocket).second;
-            out.writeObject(delivery);
-            out.flush();
-        }*/
     }
 
     /**
@@ -518,10 +492,11 @@ public class CollabServer implements CollabInterface {
 //        this.displayGui.updateDocumentsList(docs.toArray());
 
         // For each client
-        for (String clientName : clientSockets.keySet()) {
-            if(clientName == null) continue;
+        for (String clientName : clientInfos.keySet()) {
+            if (clientName == null) continue;
             // retrieve the sockets for the client
-            Pair<Socket, Boolean> p = clientSockets.get(clientName);
+            Pair<Socket, Boolean> p = clientInfos.get(clientName).socket;
+            if (p == null) continue;
             Socket currentSocket = p.first;
             Boolean activeSocket = p.second;
 
@@ -536,7 +511,7 @@ public class CollabServer implements CollabInterface {
             // Creates a cloned pair of usernames and documents
             Pair<ArrayList<String>, ArrayList<String>> pair = new Pair<>(
                     (ArrayList<String>) usernames.clone(),
-                     filteredList(clientName));
+                    filteredDocumentList(clientName));
 
             // Sends it to the client
             out.writeObject(pair);

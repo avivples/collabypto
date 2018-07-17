@@ -129,22 +129,19 @@ public class DocumentSelectionPage extends JFrame {
 					//when the client creates a new document, we ask them to provide the list of clients that can access the document.
 					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
 					String[] clientNames = clientCommas.split(",");
-					String[] clientList = new String[clientNames.length + 1];
-                    System.arraycopy(clientNames, 0, clientList, 0, clientList.length - 1);
-					clientList[clientList.length - 1] = client.getUsername();
+					String[] clientList;
+					if(clientNames[0].equals("") && clientNames.length == 1) {
+						clientList = new String[1];
+						clientList[0] = client.getUsername();
+					}
+					else {
+						clientList = new String[clientNames.length + 1];
+						System.arraycopy(clientNames, 0, clientList, 0, clientList.length - 1);
+						clientList[clientList.length - 1] = client.getUsername();
+					}
 					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
-					try {
-						client.setCipher();
-					} catch (NoSuchPaddingException e) {
-						e.printStackTrace();
-					} catch (NoSuchAlgorithmException e) {
-						e.printStackTrace();
-					} catch (InvalidKeyException e) {
-						e.printStackTrace();
-					} catch (InvalidAlgorithmParameterException e) {
-						e.printStackTrace();
-					}
+
 					try {
 						//give the document name and client list to the server.
 						client.transmit(documentInput.getText());

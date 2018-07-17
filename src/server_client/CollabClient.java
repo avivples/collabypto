@@ -65,8 +65,6 @@ public class CollabClient implements CollabInterface {
 	private String document = "";
 	/** list of clients current doc is shared with */
 
-	// TODO: maybe not have mapping to PreKeyBundle but to shared key
-
 	// storing the session ciphers
 	private HashMap<String, ArrayList<ClientSessionCipher>> sessionCiphers = new HashMap<>();
 
@@ -266,7 +264,6 @@ public class CollabClient implements CollabInterface {
 	@SuppressWarnings("unchecked")
     public void parseInput(Object o) throws IOException, OperationEngineException {
 	    //the server mostly sends pairs to the client - with an operation and its order, or a pair of the list of documents and list of users, or with a history of operations and document instance.
-		//TODO: Figure out when and how to encrypt when sending pairs. Possibly make a new object for encrypted/unencrypted pairs.
 	    if (o instanceof Pair) {
 	    	Pair p = (Pair) o;
 	    	Object plaintext = p.first;
@@ -331,7 +328,6 @@ public class CollabClient implements CollabInterface {
 					System.out.println("site ID is the same " + getID());
 					return; //shouldn't happen when server sends to specific users
 				}
-				System.out.println(getUsername() + " Got message from " + message.senderID + " for " + message.recipientID);
 				op.setOrder(message.order);
 				updateDoc(op);
 			}
@@ -477,7 +473,6 @@ public class CollabClient implements CollabInterface {
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
 	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
 		StringBuilder doc = new StringBuilder();
-		System.err.println(history.size());
 		Operation[] operations = new Operation[history.size()];
 		int i = 0;
 		for(EncryptedMessage message : history) {
