@@ -331,7 +331,6 @@ public class CollabClient implements CollabInterface {
 					System.out.println("site ID is the same " + getID());
 					return; //shouldn't happen when server sends to specific users
 				}
-				System.out.println(getUsername() + " Got message from " + message.senderID + " for " + message.recipientID);
 				op.setOrder(message.order);
 				updateDoc(op);
 			}
@@ -477,7 +476,6 @@ public class CollabClient implements CollabInterface {
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
 	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
 		StringBuilder doc = new StringBuilder();
-		System.err.println(history.size());
 		Operation[] operations = new Operation[history.size()];
 		int i = 0;
 		for(EncryptedMessage message : history) {
