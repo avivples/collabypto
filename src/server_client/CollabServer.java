@@ -1,9 +1,6 @@
 package server_client;
 
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
@@ -20,8 +17,6 @@ import javax.swing.JFrame;
 import javax.swing.text.BadLocationException;
 
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
@@ -227,6 +222,7 @@ public class CollabServer implements CollabInterface {
     public void handleConnection(Socket socket) throws IOException {
         String documentID = "";
         String clientName = "";
+        Boolean returningUser = false;
         ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
         ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
 
@@ -242,8 +238,17 @@ public class CollabServer implements CollabInterface {
             if (input instanceof Pair) {
                 Pair p = (Pair) input;
                 clientName = (String) p.first;
-                clientInfos.put(clientName, clientInfo);
-                clientInfo.registrationInfo = (RegistrationInfo) p.second;
+                if(p.second instanceof  Boolean) {
+                    clientInfo = clientInfos.get(clientName);
+                    if(clientInfo == null) {
+                        System.err.println(clientName + " attempted to log in as returning user without info");
+                        return;
+                    }
+                }
+                else {
+                    clientInfos.put(clientName, clientInfo);
+                    clientInfo.registrationInfo = (RegistrationInfo) p.second;
+                }
             }
             else {
                 throw new IOException("Expected client name");
@@ -259,17 +264,22 @@ public class CollabServer implements CollabInterface {
 
                 // Receives which document to edit or F5 request
                 input = in.readObject();
-                if (!(input instanceof String)) {
-                    throw new RuntimeException("Expected document name or documents request");
+                if(input instanceof String) {
+                    if(input.equals("refresh")) continue;
+                    else throw new IOException("expected refresh request but got " + input);
                 }
-                else if(!input.equals("give documents please thanks")) { //Shouldn't be a string because someone can name his document this but whatever
+
+                //got document name + returning user boolean pair
+                else if (input instanceof Pair) {
+                    returningUser = (Boolean) ((Pair)input).second;
+                    System.out.println(clientName + " returning user value is " + returningUser);
                     break;
                 }
             }
 
             synchronized (lock) {
                 // TODO: client crashes if you use an existing document name. Maybe fix
-                documentID = (String) input;
+                documentID = (String) ((Pair) input).first;
                 clientInfo.currentDocument = documentID;
                 // If document does not exist, create it
                 if (!documents.containsKey(documentID)) {
@@ -281,17 +291,15 @@ public class CollabServer implements CollabInterface {
 
                         //build sessioninfo for document creator with the rest of the users. Assumes everyone is registered.
                         for(String client : clientList) {
-                            System.out.println(client);
                             UserInfo curUser = clientInfos.get(client);
-                            System.out.println(curUser == null);
+                            if(clientInfos.get(client).registrationInfo == null) {
+                                throw new IllegalArgumentException("Client in list does not exist. Add error checking to handle this instead of an exception later.");
+                            }
                             curUser.histories.put(documentID, new ArrayList<>());
                             if(curUser.socket == null) curUser.socket = new Pair(null, false); //don't know the client's socket yet
                         }
 
                         for(String client : clientList) {
-                            if(clientInfos.get(client).registrationInfo == null) {
-                                throw new IllegalArgumentException("Client in list does not exist. Add error checking to handle this instead of an exception later.");
-                            }
                             UserInfo curUser = clientInfos.get(client);
                             RegistrationInfo registrationInfo = curUser.registrationInfo;
 
@@ -327,12 +335,11 @@ public class CollabServer implements CollabInterface {
 //            }
             out.writeObject(clientID);
             out.flush();
-            out.writeObject(clientInfos.get(clientName).sessionInfos);
-            out.flush();
+            if(!returningUser) {
+                out.writeObject(clientInfos.get(clientName).sessionInfos);
+                out.flush();
+            }
             // Sends to client the client ID
-
-
-            Pair<String, String> pair = new Pair<>(clientName, documentID);
 
             //send the client the history of the document.
             out.writeObject(new Pair(documentInstances.get(documentID), clientInfo.histories.get(documentID)));

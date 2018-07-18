@@ -85,6 +85,7 @@ public class ClientGui extends JPanel {
         this.label = label;
         this.init = init;
         createGUI();
+
     }
 
     /**
@@ -227,6 +228,7 @@ public class ClientGui extends JPanel {
                 .addComponent(rightPane));
         wholePane.setLayout(allGroup);
         add(wholePane);
+
     }
 
     /**

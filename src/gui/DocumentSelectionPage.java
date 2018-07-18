@@ -1,5 +1,7 @@
 package gui;
 
+import document.OperationEngineException;
+import document.Pair;
 import server_client.CollabClient;
 
 import javax.crypto.NoSuchPaddingException;
@@ -55,7 +57,7 @@ public class DocumentSelectionPage extends JFrame {
 			public void actionPerformed(ActionEvent e) {
 					try {
 						//asks the server for the list of documents.
-						client.transmit("give documents please thanks");
+						client.transmit("refresh");
 					} catch (IOException e1) {
 						e1.printStackTrace();
 					}
@@ -98,11 +100,13 @@ public class DocumentSelectionPage extends JFrame {
 				    String docName = (String) listDocumentModel.get(index);
 					client.setDocument(docName);
                     try {
-                        client.transmit(docName);
+                       client.transmit(new Pair(docName, client.readDocument()));
                     } catch (IOException e1) {
                         e1.printStackTrace();
-                    }
-                    dispose();
+                    } catch (OperationEngineException e1) {
+						e1.printStackTrace();
+					}
+					dispose();
 				} else {
 					new ErrorDialog(
 							"Please select the document you want to edit");
@@ -141,10 +145,9 @@ public class DocumentSelectionPage extends JFrame {
 					}
 					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
-
 					try {
 						//give the document name and client list to the server.
-						client.transmit(documentInput.getText());
+						client.transmit(new Pair(documentInput.getText(), false));
 						client.transmit(clientList);
 					} catch (IOException e) {
 						e.printStackTrace();

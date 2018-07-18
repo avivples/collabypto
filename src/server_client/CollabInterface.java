@@ -18,14 +18,14 @@ public interface CollabInterface {
      * for the client
      * @return the string version of the model
      */
-    public String toString();
+    String toString();
     
     /**
      * This will return the unique integer id of this client or server.  Integer ID
      * must be incrementing integers starting at 0 for the server, 1, 2, 3, ..etc. for the clients
      * @return integer siteID
      */
-    public int getID();
+    int getID();
     
     /**
      * For the client, this will take the operation that was performed locally, and transmit it
@@ -36,16 +36,16 @@ public interface CollabInterface {
      * @param op
      * @throws IOException 
      */
-    public void transmit(Object op) throws IOException;
+    void transmit(Object op) throws IOException;
 
-    public void transmit(Object o, ENCRYPTION_METHOD encryption) throws IOException;
+    void transmit(Object o, ENCRYPTION_METHOD encryption) throws IOException;
 
     /**
      * Updates the copy of the document using operational transform
      * through a call to the CollabModel's remoteInsert/remoteDelete
      * @param o - the operation that was received to apply to the model
      */
-    public void updateDoc(Operation o);
+    void updateDoc(Operation o);
 
 
 }

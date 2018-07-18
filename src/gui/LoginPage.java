@@ -80,6 +80,10 @@ public class LoginPage extends JFrame{
                     userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
                     userName = userNameInput.getText().trim();
+                    while(!userName.matches("[A-Za-z0-9]+") && userName.length() < 1) {
+                        userName = JOptionPane.showInputDialog("Enter alphanumeric username:");
+                        //TODO: stop user from entering when pressing cancel
+                    }
                 }
                 frame.dispose();
                 collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName);
@@ -100,6 +104,9 @@ public class LoginPage extends JFrame{
                     userName = JOptionPane.showInputDialog("Enter username:");
                 } else {
                     userName = userNameInput.getText().trim();
+                    while(!userName.matches("[A-Za-z0-9]+") && userName.length() < 1) {
+                        userName = JOptionPane.showInputDialog("Enter alphanumeric username:");
+                    }
                 }
                 String ip = ipInput.getText().trim();
                 String portInputString = portInput.getText().trim();

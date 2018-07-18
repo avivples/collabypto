@@ -68,12 +68,21 @@ public class CollabClient implements CollabInterface {
 	// storing the session ciphers
 	private HashMap<String, ArrayList<ClientSessionCipher>> sessionCiphers = new HashMap<>();
 
+	private int numClientsInDocument;
+
 	/** port number of client */
 	private int port;
 	/** ip number of client */
 	private String ip;
+
+	private String serverName;
+
+	private String dir;
 	/** username of client */
 	private String name;
+
+	//the text of the document
+	private DocumentState documentState = new DocumentState("", null);
 
 	/** label to display at the top of the document GUI */
 	protected String label = "Client";
@@ -96,6 +105,7 @@ public class CollabClient implements CollabInterface {
 
 	protected SecretKey key;
 
+	// TODO: Remove ALL AES stuff
 	byte[] keyBytes;
 	byte[] iv;
 
@@ -115,6 +125,8 @@ public class CollabClient implements CollabInterface {
 		this.ip = IP;
 		this.port = port;
 		this.name = name;
+		this.serverName = ip + "-" + port;
+		this.dir =  "users/" + name + "/" + serverName;
 	}
 
 	/**
@@ -130,8 +142,8 @@ public class CollabClient implements CollabInterface {
         } catch (InvalidKeyException e) {
 			e.printStackTrace();
 		}
-
 	}
+
 
     //Creates a list of bundles to pass to the server, so the server can create sessions with other users.
 	private RegistrationInfo register () throws InvalidKeyException {
@@ -151,11 +163,96 @@ public class CollabClient implements CollabInterface {
 			pK.serialize();
 		}
 		clientStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
-		//clientStore.
 		RegistrationInfo registrationInfo = new RegistrationInfo(preKeyBundles);
 		return registrationInfo;
 	}
 
+	// write information on exit to load when client rejoins
+	private void writeToFile() throws IOException, OperationEngineException {
+		Class<?>[] classes = new Class[] {HashMap.class, ClientSessionCipher.class};
+		XStream xs = new XStream(new DomDriver());
+		XStream.setupDefaultSecurity(xs);
+		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
+		xs.allowTypes(classes);
+
+		String fileName = dir + "/clientStore.txt";
+		File clientStoreFile = new File(fileName);
+		clientStoreFile.getParentFile().mkdirs();
+		clientStoreFile.createNewFile();
+		String xml = xs.toXML(clientStore);
+		writeXMLToFile(clientStoreFile, xml);
+
+
+		if(!document.equals("")) {
+			DocumentState documentState = new DocumentState(gui.getCollabModel().getDocumentText(), gui.getCollabModel().copyOfCV());
+			fileName = dir + "/doc-" + document + ".txt";
+			File documentStateFile = new File(fileName);
+            documentStateFile.createNewFile();
+			xml = xs.toXML(documentState);
+			writeXMLToFile(documentStateFile, xml);
+		}
+		fileName = dir + "/sessionCiphers.txt";
+		File sessionCiphersFile = new File(fileName);
+        sessionCiphersFile.createNewFile();
+		xml = xs.toXML(sessionCiphers);
+		writeXMLToFile(sessionCiphersFile, xml);
+	}
+
+	private void writeXMLToFile(File file, String xml) throws IOException {
+		FileWriter writer = new FileWriter(file, false);
+		writer.write(xml);
+		writer.close();
+	}
+
+	//reads and sets clientstore and sessionciphers. Returns true if we had this information, false otherwise. There is currently no check to missing/faulty files/directories, but fake data would just cause you to crash rather than get access.
+	private boolean readFromFile() throws IOException {
+		Class<?>[] classes = new Class[] {HashMap.class, ClientSessionCipher.class};
+		XStream xs = new XStream(new DomDriver());
+		XStream.setupDefaultSecurity(xs);
+		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
+		xs.allowTypes(classes);
+
+		if(!new File(dir).exists()) {
+			return false;
+		}
+
+		String fileName = dir + "/clientStore.txt";
+		File clientStoreFile = new File(fileName);
+		String xml = readAllFile(clientStoreFile);
+		clientStore = (InMemorySignalProtocolStore) xs.fromXML(xml);
+
+		// TODO: when selecting a document (not here) check if file exists, if so use it, if not ask server for sessions
+
+		fileName = dir + "/sessionCiphers.txt";
+		File sessionCiphersFile = new File(fileName);
+		xml = readAllFile(sessionCiphersFile);
+		sessionCiphers = (HashMap<String, ArrayList<ClientSessionCipher>>) xs.fromXML(xml);
+
+		return true;
+	}
+
+	public boolean readDocument() throws IOException, OperationEngineException {
+		Class<?>[] classes = new Class[] {DocumentState.class };
+		XStream xs = new XStream(new DomDriver());
+		XStream.setupDefaultSecurity(xs);
+		xs.allowTypes(classes);
+		File documentFile = new File(dir + "/doc-" + document + ".txt");
+		if(!documentFile.exists()) return false;
+
+		String xml = readAllFile(documentFile);
+		this.documentState = (DocumentState) xs.fromXML(xml);
+		return true;
+	}
+
+	private String readAllFile(File file) throws IOException {
+		FileInputStream fis = new FileInputStream(file);
+		byte[] data = new byte[(int) file.length()];
+		fis.read(data);
+		fis.close();
+
+		String str = new String(data);
+		return str;
+	}
 
 	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
 												   int registrationId, List<PreKeyRecord> preKeys,
@@ -186,7 +283,6 @@ public class CollabClient implements CollabInterface {
      * the operation engine
 	 */
 	public void connect() throws IOException, InvalidKeyException {
-
 	    // Establishes a socket connection
 		System.out.println("Connecting to port: " + this.port + " at: " + this.ip);
 		InetSocketAddress address = new InetSocketAddress(this.ip, this.port);
@@ -209,9 +305,24 @@ public class CollabClient implements CollabInterface {
 			out = new ObjectOutputStream(s.getOutputStream());
 			in = new ObjectInputStream(s.getInputStream());
 
+			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+				//doesnt work if process shuts down unexpectedly
+				try {
+					writeToFile();
+				} catch (IOException e) {
+					e.printStackTrace();
+				} catch (OperationEngineException e) {
+					e.printStackTrace();
+				}
+			}));
 			// TODO: authentication
 			try {
-			transmit(new Pair(getUsername(), register()));
+			if(!readFromFile()) {
+				transmit(new Pair(getUsername(), register()));
+			}
+			else {
+				transmit(new Pair(getUsername(), new Boolean(true))); //send that we already registered
+			}
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -249,7 +360,6 @@ public class CollabClient implements CollabInterface {
 			out.close();
 			in.close();
 			System.exit(0);
-
 		}
 	}
 
@@ -283,13 +393,12 @@ public class CollabClient implements CollabInterface {
 			} else if (plaintext instanceof DocumentInstance) {
 			    //we got history and documentinstance from the server, so update this user to the current state using the history.
 				DocumentInstance documentInstance = (DocumentInstance) plaintext;
-				String text = documentInstance.document;
 				ArrayList<EncryptedMessage> history = (ArrayList) p.second;
 				if (history.size() > 0) {
-					text = updateFromHistory(history, text);
+					documentState.documentText = updateFromHistory(history, documentState.documentText);
 				}
 				try {
-					this.gui = new ClientGui(text, this, label);
+					this.gui = new ClientGui(documentState.documentText, this, label);
 				} catch (OperationEngineException e) {
 					e.printStackTrace();
 				}
@@ -312,7 +421,9 @@ public class CollabClient implements CollabInterface {
 					catch (Exception e) {
 						e.printStackTrace();
 					}
-
+					if(documentState.contextVector != null) {
+						gui.getCollabModel().setCV(documentState.contextVector);
+					}
 					ClientState cV = lastOp.getClientState();
 					gui.getCollabModel().setCV(cV);
 					lastOp.setOrder(history.size() - 1);
@@ -380,6 +491,7 @@ public class CollabClient implements CollabInterface {
 
 
 	private Object encrypt(Object plaintext) throws IOException, UntrustedIdentityException {
+		if(numClientsInDocument == 1) return null;
 		Class<?>[] classes = new Class[] { Operation.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
@@ -395,7 +507,7 @@ public class CollabClient implements CollabInterface {
 					clientSessionCipher = sessionCipher;
 				}
 			}
-
+			if(clientSessionCipher == null) continue;
 			//turn it into a string so we can send it easily
 			String xml = xs.toXML(plaintext);
 
@@ -472,7 +584,7 @@ public class CollabClient implements CollabInterface {
 
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
 	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
-		StringBuilder doc = new StringBuilder();
+		StringBuilder doc = new StringBuilder(text);
 		Operation[] operations = new Operation[history.size()];
 		int i = 0;
 		for(EncryptedMessage message : history) {
@@ -600,6 +712,7 @@ public class CollabClient implements CollabInterface {
 	public String getUsername() {
 	    return this.name;
 	}
+
 
 /*
 	private Object decryptAES(Object cipherText) throws IOException, BadPaddingException, IllegalBlockSizeException {

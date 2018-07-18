@@ -283,6 +283,8 @@ public class CollabModel extends DefaultStyledDocument {
     public void setKey(String str) {
         this.OPKEY = str;
     }
+
+    public String getDocumentText() { return this.mainDocument.getText(); }
 }
 
 
