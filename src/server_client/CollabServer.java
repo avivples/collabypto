@@ -20,6 +20,7 @@ import javax.swing.text.BadLocationException;
 import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
+import org.apache.commons.lang3.RandomStringUtils;
 import signal.EncryptedMessage;
 import signal.RegistrationInfo;
 import signal.SessionInfo;
@@ -104,7 +105,7 @@ public class CollabServer implements CollabInterface {
     /**
      * List of all documents
      */
-    private HashMap<String, ServerGui> documents = new HashMap<>();
+    private ArrayList<String> documents = new ArrayList<>();
 
     // TODO: Put history and documentInstance for every doc. For only one for testing
     private HashMap<String, String[]> clientLists = new HashMap<>();
@@ -113,6 +114,7 @@ public class CollabServer implements CollabInterface {
 //    private int accept = 0;
 
     private HashMap<String, UserInfo> clientInfos = new HashMap<>();
+    private ArrayList<String> tokens = new ArrayList<>();
 
     /**
      * Constructor for making a server. It will set the port number, create a
@@ -139,7 +141,6 @@ public class CollabServer implements CollabInterface {
         // TODO: probably delete if no issues arise
         // The server is viewed as the zeroth socket
 //        clientSockets.put(null, null);
-
         System.out.println("Server created.");
     }
 
@@ -149,8 +150,9 @@ public class CollabServer implements CollabInterface {
      *
      * @throws OperationEngineException if the operation finds an inconsistency
      */
-    public void start() {
+    public void start(ServerGui gui) {
         try {
+            this.displayGui = gui;
             this.serve();
         } catch (IOException e) {
             new ErrorDialog(e.toString());
@@ -169,14 +171,6 @@ public class CollabServer implements CollabInterface {
      *                     individual clients do *not* terminate serve()).
      */
     public void serve() throws IOException {
-//        frame = new JFrame("Collab Edit Demo");
-//        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        // Add content to the window.
-//        frame.add(this.displayGui);
-
-        // Display the window.
-//        frame.pack();
-//        frame.setVisible(true);
 
         while (true) {
             if (this.users > MAX_CLIENTS) {
@@ -282,7 +276,8 @@ public class CollabServer implements CollabInterface {
                 documentID = (String) ((Pair) input).first;
                 clientInfo.currentDocument = documentID;
                 // If document does not exist, create it
-                if (!documents.containsKey(documentID)) {
+                if (!documents.contains(documentID)) {
+                    documents.add(documentID);
                     documentInstances.put(documentID, new DocumentInstance(""));
                     input = in.readObject();
                     if (input instanceof String[]) {
@@ -317,9 +312,6 @@ public class CollabServer implements CollabInterface {
                     }
 
                     // TODO: At some point remove this. WE DON'T WANT SERVER GUI
-                    ServerGui newGui = new ServerGui(this, documentID);
-                    newGui.setModelKey(documentID);
-                    documents.put(documentID, newGui);
                 }
                 this.users++;
                 //set user as joined and associate with his socket
@@ -388,7 +380,7 @@ public class CollabServer implements CollabInterface {
                     this.users--;
                     usernames.remove(clientName);
                     // need to update the view of who still in the edit room
-                    documents.get(documentID).updateUsers(this.usernames.toArray());
+                    //documents.get(documents.indexOf(documentID)).updateUsers(this.usernames.toArray()); //TODO
                 } catch (Exception e) {
                     System.err.println("Client not found");
                 }
@@ -400,10 +392,21 @@ public class CollabServer implements CollabInterface {
         }
     }
 
+    public String generateToken() {
+        boolean exists = true;
+        String generatedString = "";
+        while (exists) {
+            generatedString = RandomStringUtils.randomAlphanumeric(10);
+            exists = tokens.contains(generatedString);
+        }
+        tokens.add(generatedString);
+        return generatedString;
+    }
+
     //Returns a list of all documents given client has authorization to see
     private ArrayList<String> filteredDocumentList (String clientName) {
         ArrayList<String> clientDocuments = new ArrayList<>();
-        for (String document : documents.keySet()) {
+        for (String document : documents) {
             String[] clientList = clientLists.get(document);
             for (int i = 0; i < clientList.length; i++) {
                 if (clientList[i].equals(clientName)) {
@@ -493,7 +496,7 @@ public class CollabServer implements CollabInterface {
         ObjectOutputStream out = null;
 //        this.displayGui.updateUsers(((ArrayList<String>) usernames.clone()).toArray());
         ArrayList<String> docs = new ArrayList<String>();
-        docs.addAll(documents.keySet());
+        docs.addAll(documents);
         // Sorts the document list in alphabetical order
         Collections.sort(docs);
 //        this.displayGui.updateDocumentsList(docs.toArray());
@@ -527,32 +530,6 @@ public class CollabServer implements CollabInterface {
     }
 
     /**
-     * Switches between documents to be displayed on the server. This happens
-     * when a user clicks on a document name on the server GUI.
-     *
-     * @param document - the document name to be switched
-     */
-    public synchronized void switchScreen(String document) {
-        // TODO: remove
-        if (!documents.containsKey(document))
-            throw new RuntimeException("Document not found!");
-        this.displayGui = documents.get(document);
-        this.displayGui.updateUsers(this.usernames.toArray());
-        ArrayList<String> temp = new ArrayList<String>();
-        temp.addAll(this.getDocumentsName());
-        // Sorts the document list in alphabetical order
-        Collections.sort(temp);
-        this.displayGui.updateDocumentsList(temp.toArray());
-        this.displayGui.repaint();
-        this.displayGui.revalidate();
-
-        frame.setContentPane(displayGui);
-        frame.setVisible(true);
-
-    }
-
-
-    /**
      * @return the ID of the server, which is always 0
      */
     @Override
@@ -575,8 +552,8 @@ public class CollabServer implements CollabInterface {
      *
      * @return the list of documents
      */
-    public Set<String> getDocumentsName() {
-        return documents.keySet();
+    public ArrayList<String> getDocumentsName() {
+        return documents;
     }
 
     /**
@@ -598,13 +575,6 @@ public class CollabServer implements CollabInterface {
      */
     public String getUsername() {
         return this.serverName;
-    }
-
-    /**
-     * @return HashMap of documents to ServerGuis
-     */
-    public HashMap<String, ServerGui> getDocuments() {
-        return this.documents;
     }
 
     /**
@@ -637,8 +607,3 @@ public class CollabServer implements CollabInterface {
         this.users = users;
     }
 }
-
-
-
-
-

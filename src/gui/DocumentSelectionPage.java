@@ -4,19 +4,15 @@ import document.OperationEngineException;
 import document.Pair;
 import server_client.CollabClient;
 
-import javax.crypto.NoSuchPaddingException;
 import javax.swing.*;
-import javax.swing.GroupLayout.Alignment;
 import javax.swing.border.Border;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 
 /**
@@ -26,21 +22,22 @@ public class DocumentSelectionPage extends JFrame {
 
 	private static final long serialVersionUID = 8079538911030861097L;
 
-	private static final String INSTRUCTION = "Select Document to Edit Or Create New Document";
+	private static final String INSTRUCTION = "Select An Existing Document to Edit";
 	private static final String SELECT_BUTTON = "Select Document";
+	private static final String REFRESH_BUTTON = "Refresh List";
 	private static final String NEW_DOCUMENT = "New Document";
 
 	// Holds the list of documents to display
 	private JList listOfDocument;
-    private DefaultListModel listDocumentModel;
-    // Holds name of created document
+	private DefaultListModel listDocumentModel;
+	// Holds name of created document
 	private JTextArea documentInput;
 
 
-    /**
+	/**
 	 * This constructor takes in the list of documents and the server_client to create
 	 * the GUI directly after created
-	 * 
+	 *
 	 * @param documents
 	 *            the list of name of the documents
 	 * @param client
@@ -48,24 +45,25 @@ public class DocumentSelectionPage extends JFrame {
 	 */
 	public DocumentSelectionPage(ArrayList<String> documents, final CollabClient client) {
 		Collections.sort(documents);
-		//TODO: Add the user's name as the frame's title
 		JPanel mainPanel = new JPanel();
+		Border border = BorderFactory.createTitledBorder("Welcome " + client.getUsername() + "!");
+		mainPanel.setBorder(border);
 		mainPanel.grabFocus();
 		//creates an action that refreshes the document list, and binds it to F5.
 		Action updateDocuments = new AbstractAction("updateDocuments") {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-					try {
-						//asks the server for the list of documents.
-						client.transmit("refresh");
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					}
-					try {
-						updateDocumentsList(client.readNewDocumentsList());
-					} catch (IOException | ClassNotFoundException e1) {
-						e1.printStackTrace();
-					}
+				try {
+					//asks the server for the list of documents.
+					client.transmit("refresh");
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				try {
+					updateDocumentsList(client.readNewDocumentsList());
+				} catch (IOException | ClassNotFoundException e1) {
+					e1.printStackTrace();
+				}
 			}
 		};
 		mainPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
@@ -83,6 +81,9 @@ public class DocumentSelectionPage extends JFrame {
 
 		listOfDocument.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 		JScrollPane documentScrollPane = new JScrollPane(listOfDocument);
+		Border border2 = BorderFactory.createLineBorder(Color.BLACK);
+		documentScrollPane.setBorder(BorderFactory.createCompoundBorder(border2,
+				BorderFactory.createEmptyBorder()));
 		documentScrollPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
 		documentScrollPane.getActionMap().put("updateDocuments", updateDocuments);
 		documentScrollPane.requestFocusInWindow();
@@ -97,13 +98,13 @@ public class DocumentSelectionPage extends JFrame {
 			public void actionPerformed(ActionEvent e) {
 				int index = listOfDocument.getSelectedIndex();
 				if (index != -1) {
-				    String docName = (String) listDocumentModel.get(index);
+					String docName = (String) listDocumentModel.get(index);
 					client.setDocument(docName);
-                    try {
-                       client.transmit(new Pair(docName, client.readDocument()));
-                    } catch (IOException e1) {
-                        e1.printStackTrace();
-                    } catch (OperationEngineException e1) {
+					try {
+						client.transmit(new Pair(docName, client.readDocument()));
+					} catch (IOException e1) {
+						e1.printStackTrace();
+					} catch (OperationEngineException e1) {
 						e1.printStackTrace();
 					}
 					dispose();
@@ -114,22 +115,58 @@ public class DocumentSelectionPage extends JFrame {
 			}
 		});
 
+		JButton refreshButton = new JButton(REFRESH_BUTTON);
+		refreshButton.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				try {
+					//asks the server for the list of documents.
+					client.transmit("refresh");
+				} catch (IOException e1) {
+					e1.printStackTrace();
+				}
+				try {
+					updateDocumentsList(client.readNewDocumentsList());
+				} catch (IOException | ClassNotFoundException e1) {
+					e1.printStackTrace();
+				}
+			}
+		});
+
 		leftPane.add(label, BorderLayout.PAGE_START);
 		leftPane.add(documentScrollPane, BorderLayout.CENTER);
-		leftPane.add(selectButton, BorderLayout.PAGE_END);
+		JPanel subPanel = new JPanel();
+		subPanel.add(selectButton);
+		subPanel.add(refreshButton);
+		leftPane.add(subPanel, BorderLayout.PAGE_END);
 
-		JPanel rightPane = new JPanel();
-		GroupLayout newDocumentLayout = new GroupLayout(rightPane);
+		JPanel rightPane = new JPanel(new BorderLayout());
+		rightPane.requestFocusInWindow();
+		JLabel label2 = new JLabel("Create A New Document");
 		documentInput = new JTextArea();
-		documentInput.setToolTipText("Enter the name of the Document");
-		documentInput.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
-		documentInput.getActionMap().put("updateDocuments", updateDocuments);
+		documentInput.setBorder(BorderFactory.createCompoundBorder(border2,
+				BorderFactory.createEmptyBorder()));
+		documentInput.setPreferredSize(new Dimension(250, 20));
+		documentInput.setMinimumSize(new Dimension(10, 10));
+
 		JButton newDocumentButton = new JButton(NEW_DOCUMENT);
 		newDocumentButton.addActionListener(new ActionListener() {
 
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				if (documentInput.getText().length() > 0) {
+
+					// Check if document name already exists
+					ListModel model = listOfDocument.getModel();
+					for(int i = 0; i < model.getSize(); i++) {
+						String doc = (String) model.getElementAt(i);
+						if(documentInput.getText().equals(doc)) {
+							new ErrorDialog("Document name already exists! Please enter a new name.");
+							return;
+						}
+					}
+
 					//when the client creates a new document, we ask them to provide the list of clients that can access the document.
 					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
 					String[] clientNames = clientCommas.split(",");
@@ -145,6 +182,7 @@ public class DocumentSelectionPage extends JFrame {
 					}
 					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
 					client.setDocument(documentInput.getText());
+
 					try {
 						//give the document name and client list to the server.
 						client.transmit(new Pair(documentInput.getText(), false));
@@ -154,21 +192,20 @@ public class DocumentSelectionPage extends JFrame {
 					}
 					dispose();
 				} else {
-					new ErrorDialog("Please Enter the name of the Document");
+					new ErrorDialog("Please Enter the name of the document");
 				}
 
 			}
 
 		});
-		newDocumentLayout.setHorizontalGroup(newDocumentLayout
-				.createParallelGroup(Alignment.LEADING)
-				.addComponent(documentInput).addComponent(newDocumentButton));
-		newDocumentLayout.setVerticalGroup(newDocumentLayout
-				.createSequentialGroup().addComponent(documentInput)
-				.addComponent(newDocumentButton));
-		rightPane.setLayout(newDocumentLayout);
-		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-				leftPane, rightPane);
+		rightPane.add(label2, BorderLayout.PAGE_START);
+		rightPane.add(documentInput, BorderLayout.CENTER);
+		// Add subpanel even though we have only one button so it balances with the left panel
+		JPanel subPanel2 = new JPanel();
+		subPanel2.add(newDocumentButton);
+		rightPane.add(subPanel2, BorderLayout.PAGE_END);
+
+		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, rightPane);
 		mainPanel.add(splitPane);
 		pack();
 		setDefaultCloseOperation(EXIT_ON_CLOSE);

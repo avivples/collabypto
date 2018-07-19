@@ -41,7 +41,6 @@ public class DocumentSelectionListener {
 			CollabServer collabServer) {
 		this.serverGui = serverGui;		
 		this.collabServer = collabServer;
-		serverGui.addListSelectionListener(new DocumentSelection());
 	}
 
 	/**
@@ -49,34 +48,5 @@ public class DocumentSelectionListener {
 	 * changes in the document and called the model and effectly switching views
 	 * between documents
 	 */
-	class DocumentSelection implements ListSelectionListener {
-		/**
-		 * Called when the selection is no longer adjusting and if there is
-		 * document selected, it will let the collabServer switch view between
-		 * documents
-		 */
-		
-		@Override
-		public void valueChanged(final ListSelectionEvent e) {
-			SwingUtilities.invokeLater(new Runnable() {
-
-				@Override
-				public void run() {
-					if (e.getValueIsAdjusting() == false) {
-						int index = serverGui.getListOfDocuments()
-								.getSelectedIndex();
-						if (index != -1) {
-							collabServer.switchScreen((String) serverGui
-									.getListOfDocuments().getModel()
-									.getElementAt(index));
-						}
-					}
-
-				}
-			});
-
-		}
-
-	}
 
 }

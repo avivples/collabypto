@@ -10,6 +10,13 @@ import controller.DocumentSelectionListener;
 import controller.TextChangeListener;
 import document.OperationEngineException;
 
+import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
+
 /*
  * Testing Strategy:
  * See ClientGui
@@ -30,11 +37,9 @@ import document.OperationEngineException;
  * 
  */
 
-public class ServerGui extends ClientGui {
+public class ServerGui extends JPanel {
 
 	private static final long serialVersionUID = -1426186299786063098L;
-	/** The underlying model of both client and server */
-	private final CollabModel collabModel;
 	//private final DocumentSelectionListener controller;
 	private final CollabServer collabServer;
 	/** The initial String to show in the Documents */
@@ -44,13 +49,14 @@ public class ServerGui extends ClientGui {
 	 */
 	private static final String PROMPT_FOR_SERVER = "Server for document: ";
 
-    public static void main(String[] args) throws OperationEngineException {
-	    CollabServer server = new CollabServer("0.0.0.0", 4444, "server");
-	    ServerGui gui = new ServerGui(server, "server");
+    public static void main(String[] args) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
+        UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+        CollabServer server = new CollabServer("0.0.0.0", 4444, "server");
+	    ServerGui gui = new ServerGui(server);
         Thread thread = new Thread() {
             @Override
             public void run() {
-                gui.collabServer.start();
+                gui.collabServer.start(gui);
             }
         };
         thread.start();
@@ -58,86 +64,39 @@ public class ServerGui extends ClientGui {
 
 	/**
 	 * ServerGui sets up the GUI for the local client
-	 * 
-	 * @param cs
-	 *            : The CollabInterface which is implemented by both
-	 *            CollabClient and CollabServer
-	 * @param serverName
-	 *            : The name of the Server modifies: TextPane of the
-	 *            collabServer is uneditable
-	 * @throws OperationEngineException
-	 * 
 	 */
-	public ServerGui(CollabInterface cs, String serverName) throws OperationEngineException {
-		super(WELCOME_MESSAGE, PROMPT_FOR_SERVER + serverName);
-		collabServer = (CollabServer) cs;
-		collabModel = new CollabModel(textArea, collabServer);
-		// listen to change in the document
-		textArea.getDocument().addDocumentListener(
-				new TextChangeListener(collabModel));
-		textArea.setEditable(false);
-
-		// add the controller here and add model to view
-		new DocumentSelectionListener(this, collabServer);
-
+	public ServerGui(CollabServer server) {
+        collabServer = server;
+        createGUI();
 	}
 
-	/**
-	 * @return the default sizeID of the server is 0
-	 */
-	public int getSiteID() {
-		return 0;
+	public void createGUI() {
+		JFrame f = new JFrame("Collabypto Demo: Server GUI");
+		JPanel mainPanel = new JPanel();
+		JLabel token = new JLabel("Token Generation:");
+		JTextField text = new JTextField(10);
+		text.setEditable(false);
+		JButton button = new JButton("Generate Token");
+		mainPanel.add(token);
+		mainPanel.add(text);
+		mainPanel.add(button);
+		f.add(mainPanel);
+		f.pack();
+		f.setVisible(true);
+		JLabel copied = new JLabel("Token copied to clipboard! Send to who you wish to invite!");
+		button.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				String token = collabServer.generateToken();
+				text.setText(token);
+				StringSelection stringSelection = new StringSelection(token);
+				Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+				clipboard.setContents(stringSelection, null);
+				f.add(copied);
+			}
+		});
 	}
 
-	/**
-	 * @return the REFERENCE to the underlying CollabModel of the server
-	 */
-	@Override
-	public CollabModel getCollabModel() {
-		return this.collabModel;
-	}
-
-	/**
-	 * This will access the CollabModel and set the document key
-	 * 
-	 * @param str
-	 *            Modifies collabModel by changing its siteID
-	 */
-	@Override
-	public void setModelKey(String str) {
-		this.collabModel.setKey(str);
-	}
-
-	/**
-	 * Documents listener to add the model to the view
-	 * 
-	 * @param l
-	 *            the List Selection Listener
-	 */
-	public void addListSelectionListener(ListSelectionListener l) {
-		documentList.addListSelectionListener(l);
-	}
-
-	/**
-	 * This method returns the REFERENCE of the JList that currently store the
-	 * list of documents in the GUI
-	 * 
-	 * @return JList
-	 */
-	public JList getListOfDocuments() {
-		return documentList;
-	}
-
-
-
-	// THIS WAS ADDED JUST SO WE CAN TEST @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-	/**
-	 * Used by the server to make it uneditable
-	 *
-	 * @return the textArea (where the document is being edited).
-	 */
-	public JTextPane getTextArea() {
-		return this.textArea;
-	}
 
 }

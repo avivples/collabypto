@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 
@@ -38,6 +40,11 @@ import controller.RedoAction;
 import controller.TextChangeListener;
 import controller.UnDoAction;
 import document.OperationEngineException;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Arrays;
 
 /**
  * The main GUI of the client and server. This GUI will pop off after the user
@@ -85,7 +92,6 @@ public class ClientGui extends JPanel {
         this.label = label;
         this.init = init;
         createGUI();
-
     }
 
     /**
@@ -178,39 +184,69 @@ public class ClientGui extends JPanel {
                 areaScrollPane.getBorder()));
 
         userList = createUserLogin(new String[] { "No users right now." });
+        JLabel userLabel = new JLabel("Who's Viewing");
         JScrollPane userLoginScrollPane = new JScrollPane(userList);
         userLoginScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        userLoginScrollPane.setPreferredSize(new Dimension(120, 145));
+        userLoginScrollPane.setPreferredSize(new Dimension(100, 145));
         userLoginScrollPane.setMinimumSize(new Dimension(10, 10));
 
-        // Create a chat display
+        // Create a document display
         JPanel documentAreaPane = new JPanel();
         GroupLayout documentsListGroupLayout = new GroupLayout(documentAreaPane);
 
         documentList = createDocumentsLogin(new String[] { "No documents right now" });
-
         JLabel documentsLabel = new JLabel("List of Documents");
         JScrollPane documentsListScrollPane = new JScrollPane(documentList);
         userLoginScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        userLoginScrollPane.setPreferredSize(new Dimension(120, 145));
+        userLoginScrollPane.setPreferredSize(new Dimension(100, 145));
         userLoginScrollPane.setMinimumSize(new Dimension(10, 10));
 
         documentsListGroupLayout.setHorizontalGroup(documentsListGroupLayout
                 .createParallelGroup(GroupLayout.Alignment.LEADING)
-                .addComponent(userLoginScrollPane).addComponent(documentsLabel)
+                .addComponent(userLabel)
+                .addComponent(userLoginScrollPane)
+                .addComponent(documentsLabel)
                 .addComponent(documentsListScrollPane));
 
         documentsListGroupLayout.setVerticalGroup(documentsListGroupLayout
-                .createSequentialGroup().addComponent(userLoginScrollPane)
+                .createSequentialGroup()
+                .addComponent(userLabel)
+                .addComponent(userLoginScrollPane)
                 .addPreferredGap(LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(documentsLabel)
                 .addComponent(documentsListScrollPane));
         documentAreaPane.setLayout(documentsListGroupLayout);
 
-        JPanel rightPane = new JPanel(new GridLayout(1, 0));
+        JButton documentSelectButton = new JButton("Back to Document Selection");
+        documentSelectButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // TODO: add functionality
+            }
+        });
+
+        JButton saveButton = new JButton("Download Text");
+        saveButton.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String text = textArea.getText();
+                String documentName = label.split(": ")[1];
+                try (PrintWriter out = new PrintWriter(documentName + ".txt")) {
+                    out.println(text);
+                } catch (FileNotFoundException e1) {
+                    e1.printStackTrace();
+                }
+            }
+        });
+
+        JPanel rightPane = new JPanel(new BorderLayout());
         rightPane.add(documentAreaPane);
+        rightPane.add(saveButton, BorderLayout.SOUTH);
+        rightPane.add(documentSelectButton, BorderLayout.PAGE_START);
         rightPane.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Who is viewing"),
+                BorderFactory.createTitledBorder(""),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));
 
         // Put everything together.
@@ -228,7 +264,6 @@ public class ClientGui extends JPanel {
                 .addComponent(rightPane));
         wholePane.setLayout(allGroup);
         add(wholePane);
-
     }
 
     /**
