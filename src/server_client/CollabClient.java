@@ -65,7 +65,7 @@ public class CollabClient implements CollabInterface {
 	private String document = "";
 	/** list of clients current doc is shared with */
 
-	// storing the session ciphers
+	// storing the session ciphers documentname -> array of ciphers
 	private HashMap<String, ArrayList<ClientSessionCipher>> sessionCiphers = new HashMap<>();
 
 	private int numClientsInDocument;
@@ -190,12 +190,14 @@ public class CollabClient implements CollabInterface {
             documentStateFile.createNewFile();
 			xml = xs.toXML(documentState);
 			writeXMLToFile(documentStateFile, xml);
+
+			fileName = dir + "/sessions-" + document + ".txt";
+			File sessionCiphersFile = new File(fileName);
+			sessionCiphersFile.createNewFile();
+			xml = xs.toXML(sessionCiphers);
+			writeXMLToFile(sessionCiphersFile, xml);
 		}
-		fileName = dir + "/sessionCiphers.txt";
-		File sessionCiphersFile = new File(fileName);
-        sessionCiphersFile.createNewFile();
-		xml = xs.toXML(sessionCiphers);
-		writeXMLToFile(sessionCiphersFile, xml);
+
 	}
 
 	private void writeXMLToFile(File file, String xml) throws IOException {
@@ -206,11 +208,9 @@ public class CollabClient implements CollabInterface {
 
 	//reads and sets clientstore and sessionciphers. Returns true if we had this information, false otherwise. There is currently no check to missing/faulty files/directories, but fake data would just cause you to crash rather than get access.
 	private boolean readFromFile() throws IOException {
-		Class<?>[] classes = new Class[] {HashMap.class, ClientSessionCipher.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
 		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
-		xs.allowTypes(classes);
 
 		if(!new File(dir).exists()) {
 			return false;
@@ -221,26 +221,24 @@ public class CollabClient implements CollabInterface {
 		String xml = readAllFile(clientStoreFile);
 		clientStore = (InMemorySignalProtocolStore) xs.fromXML(xml);
 
-		// TODO: when selecting a document (not here) check if file exists, if so use it, if not ask server for sessions
-
-		fileName = dir + "/sessionCiphers.txt";
-		File sessionCiphersFile = new File(fileName);
-		xml = readAllFile(sessionCiphersFile);
-		sessionCiphers = (HashMap<String, ArrayList<ClientSessionCipher>>) xs.fromXML(xml);
-
 		return true;
 	}
 
 	public boolean readDocument() throws IOException, OperationEngineException {
-		Class<?>[] classes = new Class[] {DocumentState.class };
+		Class<?>[] classes = new Class[] {DocumentState.class, HashMap.class, ClientSessionCipher.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
+		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
 		xs.allowTypes(classes);
 		File documentFile = new File(dir + "/doc-" + document + ".txt");
 		if(!documentFile.exists()) return false;
-
 		String xml = readAllFile(documentFile);
 		this.documentState = (DocumentState) xs.fromXML(xml);
+
+		File sessionCiphersFile = new File(dir + "/sessions-" + document + ".txt");
+		xml = readAllFile(sessionCiphersFile);
+		sessionCiphers = (HashMap<String, ArrayList<ClientSessionCipher>>) xs.fromXML(xml);
+
 		return true;
 	}
 
@@ -305,6 +303,7 @@ public class CollabClient implements CollabInterface {
 			out = new ObjectOutputStream(s.getOutputStream());
 			in = new ObjectInputStream(s.getInputStream());
 
+			//TODO: race condition when people are writing while you are leaving
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				//doesnt work if process shuts down unexpectedly
 				try {
@@ -399,7 +398,8 @@ public class CollabClient implements CollabInterface {
 				}
 				try {
 					this.gui = new ClientGui(documentState.documentText, this, label);
-				} catch (OperationEngineException e) {
+				}
+				catch (OperationEngineException e) {
 					e.printStackTrace();
 				}
 				this.gui.setModelKey(document);
@@ -481,11 +481,11 @@ public class CollabClient implements CollabInterface {
 			SessionBuilder sessionBuilder = new SessionBuilder(clientStore, address);
 			sessionBuilder.process(session.preKey);  //note: sessionbuilder automatically stores the session in clientstore
 			SessionCipher sessionCipher = new SessionCipher(clientStore, address);
-			if(sessionCiphers.get(session.senderID) == null)  {
-				sessionCiphers.put(session.senderID, new ArrayList<>());
+			if(sessionCiphers.get(document) == null)  {
+				sessionCiphers.put(document, new ArrayList<>());
 			}
 			//System.out.println("sender: " + session.senderID + " recipient: " + getUsername() +  " " + session.preKey.getPreKeyId());
-			sessionCiphers.get(session.senderID).add(new ClientSessionCipher(sessionCipher, session.senderID, document));
+			sessionCiphers.get(document).add(new ClientSessionCipher(sessionCipher, session.senderID, document));
 		}
 	}
 
@@ -496,19 +496,13 @@ public class CollabClient implements CollabInterface {
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
 		xs.allowTypes(classes);
-		EncryptedMessage[] messages = new EncryptedMessage[sessionCiphers.size()];
 		int i = 0;
-		for(String client : sessionCiphers.keySet()) {
-			//find the appropriate sessioncipher to encrypt with
-			ClientSessionCipher clientSessionCipher = null;
-			for(ClientSessionCipher sessionCipher : sessionCiphers.get(client)) {
-				//TODO change structure of sessionciphers to be specific to some document as well.get(client);
-				if(sessionCipher.documentID.equals(document)) {
-					clientSessionCipher = sessionCipher;
-				}
-			}
-			if(clientSessionCipher == null) continue;
-			//turn it into a string so we can send it easily
+		//find the appropriate sessioncipher to encrypt with
+		ClientSessionCipher clientSessionCipher = null;
+		if(sessionCiphers.get(document) == null) return null;
+		EncryptedMessage[] messages = new EncryptedMessage[sessionCiphers.get(document).size()];
+		for(ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
+			clientSessionCipher = sessionCipher;
 			String xml = xs.toXML(plaintext);
 
 			//encrypt the string with the sessioncipher
@@ -518,6 +512,8 @@ public class CollabClient implements CollabInterface {
 			messages[i] = new EncryptedMessage(clientSessionCipher.senderID, getUsername(), clientSessionCipher.documentID, message.serialize());
 			i++;
 		}
+		//turn it into a string so we can send it easily
+
 		out.writeObject(messages);
 		out.flush();
 		return plaintext;
@@ -533,9 +529,8 @@ public class CollabClient implements CollabInterface {
 
 		//get the appropriate sessioncipher to decrypt this message
 		ClientSessionCipher clientSessionCipher = null;
-		for(ClientSessionCipher sessionCipher : sessionCiphers.get(signalMessage.senderID)) {
-			//TODO change structure of sessionciphers to be specific to some document as well.get(client);
-			if(sessionCipher.documentID.equals(document)) {
+		for(ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
+			if(sessionCipher.senderID.equals(signalMessage.senderID)) {
 				clientSessionCipher = sessionCipher;
 			}
 		}
@@ -584,7 +579,7 @@ public class CollabClient implements CollabInterface {
 
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
 	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
-		StringBuilder doc = new StringBuilder(text);
+		StringBuilder doc = new StringBuilder();
 		Operation[] operations = new Operation[history.size()];
 		int i = 0;
 		for(EncryptedMessage message : history) {
@@ -600,9 +595,11 @@ public class CollabClient implements CollabInterface {
 			doc.append(text);
 			for (i = 0; i < operations.length - 1; i++) {
 					Operation op = operations[i];
-					op.setOrder(i);
+					op.setOrder(i); //TODO: CHECK
 				if (op.getKey().equals(document)) {
+					System.out.println(op.getValue());
 					if (op instanceof InsertOperation) {
+						//if(doc.length() < op.getOffset()) doc.append(op.getValue());
 						doc.insert(op.getOffset(), op.getValue());
 					} else if (op instanceof DeleteOperation) {
 						doc.delete(op.getOffset(), op.getOffset() + op.getValue().length());
