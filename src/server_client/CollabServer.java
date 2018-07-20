@@ -248,7 +248,7 @@ public class CollabServer implements CollabInterface {
                 throw new IOException("Expected client name");
             }
 
-            //Stays here waiting for the user to choose a document. (his other option is pressing F5)
+            //Stays here waiting for the user to choose a document.
             while(true) {
                 clientInfo.currentDocument = "";
                 // Sends list of documents to client
@@ -256,7 +256,7 @@ public class CollabServer implements CollabInterface {
                 out.writeObject(clientDocuments);
                 out.flush();
 
-                // Receives which document to edit or F5 request
+                // Receives which document to edit
                 input = in.readObject();
                 if(input instanceof String) {
                     if(input.equals("refresh")) continue;
@@ -273,6 +273,7 @@ public class CollabServer implements CollabInterface {
 
             synchronized (lock) {
                 // TODO: client crashes if you use an existing document name. Maybe fix
+                // TODO: send client a list of registered users so he can invite whoever he wants
                 documentID = (String) ((Pair) input).first;
                 clientInfo.currentDocument = documentID;
                 // If document does not exist, create it
@@ -396,7 +397,8 @@ public class CollabServer implements CollabInterface {
         boolean exists = true;
         String generatedString = "";
         while (exists) {
-            generatedString = RandomStringUtils.randomAlphanumeric(10);
+//            generatedString = RandomStringUtils.randomAlphanumeric(10);
+            generatedString = "aaaa";
             exists = tokens.contains(generatedString);
         }
         tokens.add(generatedString);

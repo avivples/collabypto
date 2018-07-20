@@ -73,17 +73,24 @@ public class ServerGui extends JPanel {
 	public void createGUI() {
 		JFrame f = new JFrame("Collabypto Demo: Server GUI");
 		JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new FlowLayout());
+        mainPanel.setPreferredSize(new Dimension(500, 200));
+        mainPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(""),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
 		JLabel token = new JLabel("Token Generation:");
 		JTextField text = new JTextField(10);
-		text.setEditable(false);
+        text.setPreferredSize(new Dimension(200,30));
+        text.setEditable(false);
 		JButton button = new JButton("Generate Token");
-		mainPanel.add(token);
-		mainPanel.add(text);
-		mainPanel.add(button);
+		mainPanel.add(token, BorderLayout.PAGE_START);
+		mainPanel.add(text, BorderLayout.CENTER);
+		mainPanel.add(button, BorderLayout.PAGE_END);
 		f.add(mainPanel);
 		f.pack();
 		f.setVisible(true);
-		JLabel copied = new JLabel("Token copied to clipboard! Send to who you wish to invite!");
+		JLabel copied = new JLabel("Token copied to clipboard! Send token to invite!");
+
 		button.addActionListener(new ActionListener() {
 
 			@Override
@@ -93,7 +100,9 @@ public class ServerGui extends JPanel {
 				StringSelection stringSelection = new StringSelection(token);
 				Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
 				clipboard.setContents(stringSelection, null);
-				f.add(copied);
+                mainPanel.add(copied);
+                f.revalidate();
+                f.repaint();
 			}
 		});
 	}

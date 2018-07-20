@@ -7,6 +7,8 @@ import server_client.CollabClient;
 import javax.swing.*;
 import javax.swing.border.Border;
 import java.awt.*;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -26,8 +28,10 @@ public class DocumentSelectionPage extends JFrame {
 	private static final String SELECT_BUTTON = "Select Document";
 	private static final String REFRESH_BUTTON = "Refresh List";
 	private static final String NEW_DOCUMENT = "New Document";
+    private static final String GENERATE_TOKENS = "Generate Tokens";
 
-	// Holds the list of documents to display
+
+    // Holds the list of documents to display
 	private JList listOfDocument;
 	private DefaultListModel listDocumentModel;
 	// Holds name of created document
@@ -168,6 +172,7 @@ public class DocumentSelectionPage extends JFrame {
 					}
 
 					//when the client creates a new document, we ask them to provide the list of clients that can access the document.
+                    // TODO: client selection list goes here.
 					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
 					String[] clientNames = clientCommas.split(",");
 					String[] clientList;
@@ -198,11 +203,20 @@ public class DocumentSelectionPage extends JFrame {
 			}
 
 		});
-		rightPane.add(label2, BorderLayout.PAGE_START);
+
+        JButton generateTokenButton = new JButton(GENERATE_TOKENS);
+        generateTokenButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                generateTokenGUI();
+            }
+        });
+
+        rightPane.add(label2, BorderLayout.PAGE_START);
 		rightPane.add(documentInput, BorderLayout.CENTER);
-		// Add subpanel even though we have only one button so it balances with the left panel
 		JPanel subPanel2 = new JPanel();
 		subPanel2.add(newDocumentButton);
+		subPanel2.add(generateTokenButton);
 		rightPane.add(subPanel2, BorderLayout.PAGE_END);
 
 		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, rightPane);
@@ -223,4 +237,48 @@ public class DocumentSelectionPage extends JFrame {
 		this.repaint();
 		this.revalidate();
 	}
+
+    public void generateTokenGUI() {
+        JFrame f = new JFrame("Generate Tokens");
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new FlowLayout());
+        mainPanel.setPreferredSize(new Dimension(500, 200));
+        mainPanel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createTitledBorder(""),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        JLabel token = new JLabel("Token Generation:");
+        JTextField text = new JTextField(10);
+        text.setPreferredSize(new Dimension(200,30));
+        text.setEditable(false);
+        JButton button = new JButton("Generate Token");
+        mainPanel.add(token, BorderLayout.PAGE_START);
+        mainPanel.add(text, BorderLayout.CENTER);
+        mainPanel.add(button, BorderLayout.PAGE_END);
+        f.add(mainPanel);
+        f.pack();
+        f.setVisible(true);
+        JLabel copied = new JLabel("Token copied to clipboard! Send token to invite!");
+
+        button.addActionListener(new ActionListener() {
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String token = generateToken();
+                text.setText(token);
+                StringSelection stringSelection = new StringSelection(token);
+                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+                clipboard.setContents(stringSelection, null);
+                mainPanel.add(copied);
+                f.revalidate();
+                f.repaint();
+            }
+        });
+    }
+
+    public String generateToken() {
+//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
+        String generatedString = "aaaa";
+        return generatedString;
+    }
+
 }
