@@ -3,6 +3,7 @@ package server_client;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import document.*;
+
 import org.whispersystems.libsignal.protocol.CiphertextMessage;
 import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
 import org.whispersystems.libsignal.protocol.SignalMessage;
@@ -187,7 +188,6 @@ public class CollabClient implements CollabInterface {
 			fileName = dir + "/doc-" + document + ".txt";
 			File documentStateFile = new File(fileName);
             documentStateFile.createNewFile();
-			xml = xs.toXML(documentState);
 			writeXMLToFile(documentStateFile, xml);
 
 			fileName = dir + "/sessions-" + document + ".txt";
@@ -233,7 +233,6 @@ public class CollabClient implements CollabInterface {
 		if(!documentFile.exists()) return false;
 		String xml = readAllFile(documentFile);
 		this.documentState = (DocumentState) xs.fromXML(xml);
-
 		File sessionCiphersFile = new File(dir + "/sessions-" + document + ".txt");
 		xml = readAllFile(sessionCiphersFile);
 		sessionCiphers = (HashMap<String, ArrayList<ClientSessionCipher>>) xs.fromXML(xml);
@@ -303,6 +302,31 @@ public class CollabClient implements CollabInterface {
 			in = new ObjectInputStream(s.getInputStream());
 
 			//TODO: race condition when people are writing while you are leaving
+
+			// TODO: authentication
+            // TODO: if user is returning, then go to document selection page. Otherwise, make him enter token
+            // TODO: check if token value is correct - if not return to main page
+
+			boolean returning = readFromFile();
+
+			try {
+                if(!returning) {
+                    transmit(new Pair(this.name, register()));
+                }
+                else {
+                    transmit(new Pair(this.name, new Boolean(true))); //send that we already registered
+                }
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			if (!returning) {
+				String tokenValue = JOptionPane.showInputDialog(null,"Please enter your token:", null);
+				transmit(tokenValue);
+			}
+
+
+			Object o = in.readObject();
+
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				//doesnt work if process shuts down unexpectedly
 				try {
@@ -313,18 +337,7 @@ public class CollabClient implements CollabInterface {
 					e.printStackTrace();
 				}
 			}));
-			// TODO: authentication
-			try {
-			if(!readFromFile()) {
-				transmit(new Pair(getUsername(), register()));
-			}
-			else {
-				transmit(new Pair(getUsername(), new Boolean(true))); //send that we already registered
-			}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-			Object o = in.readObject();
+
 			if(!(o instanceof ArrayList<?>)) {
                 throw new RuntimeException("Expected ArrayList of documents");
             }
@@ -354,7 +367,9 @@ public class CollabClient implements CollabInterface {
 			e.printStackTrace();
 		} finally {
 		    // Close connection
-		    s.close();
+			JOptionPane.showMessageDialog(null,"Authentication failed", "Error", JOptionPane.ERROR_MESSAGE);
+
+			s.close();
 			out.close();
 			in.close();
 			System.exit(0);
@@ -596,7 +611,6 @@ public class CollabClient implements CollabInterface {
 					Operation op = operations[i];
 					op.setOrder(i); //TODO: CHECK
 				if (op.getKey().equals(document)) {
-					System.out.println(op.getValue());
 					if (op instanceof InsertOperation) {
 						//if(doc.length() < op.getOffset()) doc.append(op.getValue());
 						doc.insert(op.getOffset(), op.getValue());

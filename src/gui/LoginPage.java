@@ -91,12 +91,9 @@ public class LoginPage extends JFrame{
                     });
                     return;
                 }
-                // TODO: if user is returning, then go to document selection page. Otherwise, make him enter token
-                String tokenValue = JOptionPane.showInputDialog(frame,"Please enter your token:", null);
-                // TODO: check if token value is correct - if not return to main page
 
+                frame.dispose();
                 collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName);
-
                 Thread thread = new Thread(() -> collabClient.start());
                 thread.start();
             }
@@ -108,11 +105,11 @@ public class LoginPage extends JFrame{
             @Override
             public void actionPerformed(ActionEvent e) {
                 String userName = userNameInput.getText(); // get the Text from the user
-                if (userName.length() <= 0) {
-                    userName = JOptionPane.showInputDialog(frame, "Enter username:");
-                } else {
+//                if (userName.length() <= 0) {
+//                    userName = JOptionPane.showInputDialog(frame, "Enter username:");
+//                } else {
                     userName = userNameInput.getText().trim();
-                }
+//                }
                 if (userName == null || !userName.matches("[A-Za-z0-9]+") && userName.length() < 1) {
                     frame.dispose();
                     new ErrorDialog("Please enter an alphanumeric username:");

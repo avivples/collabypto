@@ -222,26 +222,44 @@ public class CollabServer implements CollabInterface {
 
         // Add stream to HashMap
         socketStreams.put(socket, new Pair<>(in, out));
-
-        UserInfo clientInfo = new UserInfo();
-
+        UserInfo clientInfo = null;
         try {
             Object input;
             //waits for client to write his name and saves it along with registration info of the user
             input = in.readObject();
+
             if (input instanceof Pair) {
                 Pair p = (Pair) input;
                 clientName = (String) p.first;
-                if(p.second instanceof  Boolean) {
-                    clientInfo = clientInfos.get(clientName);
-                    if(clientInfo == null) {
+                clientInfo = clientInfos.get(clientName);
+                if(clientInfo == null) {
+                    //client is new
+
+                    //client sent indication that he is returning even though he is new
+                    if(p.second instanceof  Boolean) {
                         System.err.println(clientName + " attempted to log in as returning user without info");
                         return;
                     }
-                }
-                else {
-                    clientInfos.put(clientName, clientInfo);
-                    clientInfo.registrationInfo = (RegistrationInfo) p.second;
+
+                    Object token = in.readObject();
+
+                    if(!(token instanceof  String) || token == null) {
+                        System.err.println(clientName + " attempted to register without token");
+                        return;
+                    }
+                    else {
+                        //check token
+                        if(tokens.contains(token)) {
+                            clientInfo = new UserInfo();
+                            clientInfos.put(clientName, clientInfo);
+                            clientInfo.registrationInfo = (RegistrationInfo) p.second;
+                            tokens.remove(token);
+                        }
+                        else {
+                            System.err.println(clientName + " attempted to register with invalid token");
+                            return;
+                        }
+                    }
                 }
             }
             else {
@@ -260,13 +278,12 @@ public class CollabServer implements CollabInterface {
                 input = in.readObject();
                 if(input instanceof String) {
                     if(input.equals("refresh")) continue;
-                    else throw new IOException("expected refresh request but got " + input);
+                    else tokens.add((String) input);
                 }
 
                 //got document name + returning user boolean pair
                 else if (input instanceof Pair) {
                     returningUser = (Boolean) ((Pair)input).second;
-                    System.out.println(clientName + " returning user value is " + returningUser);
                     break;
                 }
             }
@@ -394,13 +411,14 @@ public class CollabServer implements CollabInterface {
     }
 
     public String generateToken() {
-        boolean exists = true;
-        String generatedString = "";
-        while (exists) {
+//        boolean exists = true;
+//        String generatedString = "";
+        // We don't do check as this list can get big, and iteration would take long and chances are low for duplicates
+//        while (exists) {
 //            generatedString = RandomStringUtils.randomAlphanumeric(10);
-            generatedString = "aaaa";
-            exists = tokens.contains(generatedString);
-        }
+//            exists = tokens.contains(generatedString);
+//        }
+        String generatedString = RandomStringUtils.randomAlphanumeric(10);
         tokens.add(generatedString);
         return generatedString;
     }

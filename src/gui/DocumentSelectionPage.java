@@ -2,6 +2,7 @@ package gui;
 
 import document.OperationEngineException;
 import document.Pair;
+import org.apache.commons.lang3.RandomStringUtils;
 import server_client.CollabClient;
 
 import javax.swing.*;
@@ -36,6 +37,7 @@ public class DocumentSelectionPage extends JFrame {
 	private DefaultListModel listDocumentModel;
 	// Holds name of created document
 	private JTextArea documentInput;
+	private CollabClient client;
 
 
 	/**
@@ -48,6 +50,7 @@ public class DocumentSelectionPage extends JFrame {
 	 *            the CollabClient
 	 */
 	public DocumentSelectionPage(ArrayList<String> documents, final CollabClient client) {
+	    this.client = client;
 		Collections.sort(documents);
 		JPanel mainPanel = new JPanel();
 		Border border = BorderFactory.createTitledBorder("Welcome " + client.getUsername() + "!");
@@ -239,18 +242,18 @@ public class DocumentSelectionPage extends JFrame {
 	}
 
     public void generateTokenGUI() {
-        JFrame f = new JFrame("Generate Tokens");
+        JFrame f = new JFrame("Create Invite");
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new FlowLayout());
         mainPanel.setPreferredSize(new Dimension(500, 200));
         mainPanel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(""),
                 BorderFactory.createEmptyBorder(10, 10, 10, 10)));
-        JLabel token = new JLabel("Token Generation:");
+        JLabel token = new JLabel("Token:");
         JTextField text = new JTextField(10);
         text.setPreferredSize(new Dimension(200,30));
         text.setEditable(false);
-        JButton button = new JButton("Generate Token");
+        JButton button = new JButton("Create Invitation");
         mainPanel.add(token, BorderLayout.PAGE_START);
         mainPanel.add(text, BorderLayout.CENTER);
         mainPanel.add(button, BorderLayout.PAGE_END);
@@ -264,6 +267,11 @@ public class DocumentSelectionPage extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String token = generateToken();
+                try {
+                    client.transmit(token);
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
                 text.setText(token);
                 StringSelection stringSelection = new StringSelection(token);
                 Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
@@ -276,8 +284,7 @@ public class DocumentSelectionPage extends JFrame {
     }
 
     public String generateToken() {
-//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
-        String generatedString = "aaaa";
+        String generatedString = RandomStringUtils.randomAlphanumeric(10);
         return generatedString;
     }
 
