@@ -20,7 +20,7 @@ import javax.swing.text.BadLocationException;
 import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
-import org.apache.commons.lang3.RandomStringUtils;
+//import org.apache.commons.lang3.RandomStringUtils;
 import signal.EncryptedMessage;
 import signal.RegistrationInfo;
 import signal.SessionInfo;
@@ -411,14 +411,8 @@ public class CollabServer implements CollabInterface {
     }
 
     public String generateToken() {
-//        boolean exists = true;
-//        String generatedString = "";
-        // We don't do check as this list can get big, and iteration would take long and chances are low for duplicates
-//        while (exists) {
-//            generatedString = RandomStringUtils.randomAlphanumeric(10);
-//            exists = tokens.contains(generatedString);
-//        }
-        String generatedString = RandomStringUtils.randomAlphanumeric(10);
+//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
+        String generatedString = "aaaa";
         tokens.add(generatedString);
         return generatedString;
     }

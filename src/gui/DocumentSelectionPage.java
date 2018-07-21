@@ -2,7 +2,7 @@ package gui;
 
 import document.OperationEngineException;
 import document.Pair;
-import org.apache.commons.lang3.RandomStringUtils;
+//import org.apache.commons.lang3.RandomStringUtils;
 import server_client.CollabClient;
 
 import javax.swing.*;
@@ -158,50 +158,144 @@ public class DocumentSelectionPage extends JFrame {
 		documentInput.setMinimumSize(new Dimension(10, 10));
 
 		JButton newDocumentButton = new JButton(NEW_DOCUMENT);
-		newDocumentButton.addActionListener(new ActionListener() {
+        newDocumentButton.addActionListener(new ActionListener() {
 
-			@Override
-			public void actionPerformed(ActionEvent arg0) {
-				if (documentInput.getText().length() > 0) {
+            @Override
+            public void actionPerformed(ActionEvent arg0) {
+                if (documentInput.getText().length() > 0) {
+                    // TODO: need to check all the documents on the server - not just unique to the user
+                    // TODO: check shouldn't be on the client side
+                    // Check if document name already exists
+                    ListModel model = listOfDocument.getModel();
+                    for(int i = 0; i < model.getSize(); i++) {
+                        String doc = (String) model.getElementAt(i);
+                        if(documentInput.getText().equals(doc)) {
+                            new ErrorDialog("Document name already exists! Please enter a new name.");
+                            return;
+                        }
+                    }
 
-					// Check if document name already exists
-					ListModel model = listOfDocument.getModel();
-					for(int i = 0; i < model.getSize(); i++) {
-						String doc = (String) model.getElementAt(i);
-						if(documentInput.getText().equals(doc)) {
-							new ErrorDialog("Document name already exists! Please enter a new name.");
-							return;
-						}
-					}
-
-					//when the client creates a new document, we ask them to provide the list of clients that can access the document.
+                    //when the client creates a new document, we ask them to provide the list of clients that can access the document.
                     // TODO: client selection list goes here.
-					String clientCommas = JOptionPane.showInputDialog("Enter list of clients to share with separated by commas:");
-					String[] clientNames = clientCommas.split(",");
-					String[] clientList;
-					if(clientNames[0].equals("") && clientNames.length == 1) {
-						clientList = new String[1];
-						clientList[0] = client.getUsername();
-					}
-					else {
-						clientList = new String[clientNames.length + 1];
-						System.arraycopy(clientNames, 0, clientList, 0, clientList.length - 1);
-						clientList[clientList.length - 1] = client.getUsername();
-					}
-					// TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
-					client.setDocument(documentInput.getText());
+                    ArrayList<String> userList = new ArrayList<>();
+                    userList.add("Bob");
+                    userList.add("Yuval");
+                    userList.add("A");
+                    userList.add("B");
+                    userList.add("C");
+                    userList.add("D");
+                    userList.add("E");
+                    userList.add("F");
 
-					try {
-						//give the document name and client list to the server.
-						client.transmit(new Pair(documentInput.getText(), false));
-						client.transmit(clientList);
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-					dispose();
-				} else {
-					new ErrorDialog("Please Enter the name of the document");
-				}
+                    JFrame f = new JFrame("Invite Users");
+                    JPanel leftPanel = new JPanel();
+                    leftPanel.setLayout(new BorderLayout());
+                    leftPanel.setPreferredSize(new Dimension(400, 200));
+                    leftPanel.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createTitledBorder(""),
+                            BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+
+                    DefaultListModel availModel = new DefaultListModel();
+                    for(String u : userList) availModel.addElement(u);
+                    sortListModel(availModel);
+                    JLabel avail = new JLabel("Available Users");
+                    JList<String> availList = new JList(availModel);
+                    leftPanel.add(avail, BorderLayout.PAGE_START);
+                    leftPanel.add(new JScrollPane(availList), BorderLayout.CENTER);
+
+                    JPanel rightPanel = new JPanel();
+                    rightPanel.setLayout(new BorderLayout());
+                    rightPanel.setPreferredSize(new Dimension(400, 200));
+                    rightPanel.setBorder(BorderFactory.createCompoundBorder(
+                            BorderFactory.createTitledBorder(""),
+                            BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+                    JLabel selected = new JLabel("Selected Users");
+
+                    DefaultListModel selectedModel = new DefaultListModel();
+                    JList<String> selectedList = new JList(selectedModel);
+                    rightPanel.add(selected, BorderLayout.PAGE_START);
+                    rightPanel.add(new JScrollPane(selectedList), BorderLayout.CENTER);
+
+
+                    JButton add = new JButton("Add");
+                    JButton remove = new JButton("Remove");
+
+                    add.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            int index = availList.getSelectedIndex();
+                            String name = availList.getSelectedValue();
+                            availModel.remove(index);
+                            selectedModel.addElement(name);
+                        }
+                    });
+
+                    remove.addActionListener(new ActionListener() {
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            int index = selectedList.getSelectedIndex();
+                            String name = selectedList.getSelectedValue();
+                            selectedModel.remove(index);
+                            availModel.addElement(name);
+                            sortListModel(availModel);
+                        }
+                    });
+
+                    JPanel subPanel = new JPanel();
+
+                    subPanel.setLayout(new GridBagLayout());
+                    GridBagConstraints gbc = new GridBagConstraints();
+                    gbc.gridwidth = GridBagConstraints.REMAINDER;
+                    gbc.fill = GridBagConstraints.HORIZONTAL;
+
+                    subPanel.add(add, gbc);
+                    subPanel.add(remove, gbc);
+
+                    JButton inviteButton = new JButton("Send Document Invites");
+                    inviteButton.addActionListener(new ActionListener() {
+
+                        @Override
+                        public void actionPerformed(ActionEvent e) {
+                            int[] selectedIndices = selectedList.getSelectedIndices();
+                            ArrayList<String> clientNames = new ArrayList<String>();
+                            // Get all the selected items using the indices
+                            for (int i = 0; i < selectedIndices.length; i++) {
+                                clientNames.add(selectedList.getModel().getElementAt(selectedIndices[i]));
+                            }
+                            ArrayList<String> clientList = new ArrayList<String>();
+                            if(!clientList.isEmpty() && clientNames.get(0).equals("") && clientNames.size() == 1) {
+                                clientList.add(client.getUsername());
+                            }
+                            else {
+                                clientList = new ArrayList<String>(clientNames);
+                                clientList.add(client.getUsername());
+                            }
+
+                            // TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
+                            client.setDocument(documentInput.getText());
+
+                            try {
+                                //give the document name and client list to the server.
+                                client.transmit(new Pair(documentInput.getText(), false));
+                                client.transmit(clientList);
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
+                            dispose();
+                        }
+                    });
+
+
+                    f.add(leftPanel, BorderLayout.WEST);
+                    f.add(rightPanel, BorderLayout.EAST);
+                    f.add(inviteButton, BorderLayout.PAGE_END);
+                    f.add(subPanel, BorderLayout.CENTER);
+                    f.pack();
+                    f.setVisible(true);
+                }
+                else {
+                    new ErrorDialog("Please Enter the name of the document");
+                }
 
 			}
 
@@ -284,8 +378,21 @@ public class DocumentSelectionPage extends JFrame {
     }
 
     public String generateToken() {
-        String generatedString = RandomStringUtils.randomAlphanumeric(10);
+//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
+        String generatedString = "aaaa";
         return generatedString;
+    }
+
+    private void sortListModel(DefaultListModel<String> listModel) {
+        ArrayList<String> items = new ArrayList<String>();
+        for (int i = 0; i < listModel.getSize(); i++) {
+            items.add(listModel.getElementAt(i));
+        }
+        Collections.sort(items); // sort
+        listModel.clear();       // remove all elements
+        for(String e : items) {  // add elements
+            listModel.addElement(e);
+        }
     }
 
 }
