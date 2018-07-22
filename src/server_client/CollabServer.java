@@ -295,8 +295,6 @@ public class CollabServer implements CollabInterface {
                         clientDocuments = filteredDocumentList(clientName);
                         out.writeObject(clientDocuments);
                         out.flush();
-
-                        continue;
                     }
                     else tokens.add((String) input);
                 }
@@ -348,13 +346,10 @@ public class CollabServer implements CollabInterface {
                             }
                             //if this is the creator of the document, send him the sessions now. Else, store them.
                         }
-                        //TODO: remove sessions when user joins and builds them so he doesnt build multiple times
                     }
                     else {
                         throw new IOException("Expected client list");
                     }
-
-                    // TODO: At some point remove this. WE DON'T WANT SERVER GUI
                 }
                 this.users++;
                 //set user as joined and associate with his socket
@@ -371,6 +366,7 @@ public class CollabServer implements CollabInterface {
             out.writeObject(clientID);
             out.flush();
             if(!returningUser) {
+                //TODO: remove unneccessary session infos?
                 out.writeObject(clientInfos.get(clientName).sessionInfos);
                 out.flush();
             }

@@ -5,6 +5,7 @@ import com.thoughtworks.xstream.io.xml.DomDriver;
 import document.*;
 
 import gui.LoginPage;
+import org.apache.commons.lang3.StringUtils;
 import org.whispersystems.libsignal.protocol.CiphertextMessage;
 import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
 import org.whispersystems.libsignal.protocol.SignalMessage;
@@ -240,6 +241,10 @@ public class CollabClient implements CollabInterface {
 		if(!documentFile.exists()) return false;
 		String xml = readAllFile(documentFile);
 		this.documentState = (DocumentState) xs.fromXML(xml);
+
+		//java translates newline to \r\n - change to just \n
+		documentState.documentText = StringUtils.remove(documentState.documentText, (char) 13);
+
 		File sessionCiphersFile = new File(dir + "/sessions-" + document + ".txt");
 		xml = readAllFile(sessionCiphersFile);
 		sessionCiphers = (HashMap<String, ArrayList<ClientSessionCipher>>) xs.fromXML(xml);
