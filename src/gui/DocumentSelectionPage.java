@@ -2,7 +2,7 @@ package gui;
 
 import document.OperationEngineException;
 import document.Pair;
-//import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import server_client.CollabClient;
 
 import javax.swing.*;
@@ -176,17 +176,17 @@ public class DocumentSelectionPage extends JFrame {
                     }
 
                     //when the client creates a new document, we ask them to provide the list of clients that can access the document.
-                    // TODO: client selection list goes here.
                     ArrayList<String> userList = new ArrayList<>();
-                    userList.add("Bob");
-                    userList.add("Yuval");
-                    userList.add("A");
-                    userList.add("B");
-                    userList.add("C");
-                    userList.add("D");
-                    userList.add("E");
-                    userList.add("F");
-
+                    try {
+                        client.transmit(userList);
+                        userList = client.getUserList();
+                        userList.remove(client.getUsername());
+                    }
+                    catch (IOException e) {
+                        e.printStackTrace();
+                    } catch (ClassNotFoundException e) {
+                        e.printStackTrace();
+                    }
                     JFrame f = new JFrame("Invite Users");
                     JPanel leftPanel = new JPanel();
                     leftPanel.setLayout(new BorderLayout());
@@ -237,7 +237,7 @@ public class DocumentSelectionPage extends JFrame {
                             String name = selectedList.getSelectedValue();
                             selectedModel.remove(index);
                             availModel.addElement(name);
-                            sortListModel(availModel);
+//                            sortListModel(availModel);
                         }
                     });
 
@@ -256,29 +256,25 @@ public class DocumentSelectionPage extends JFrame {
 
                         @Override
                         public void actionPerformed(ActionEvent e) {
-                            int[] selectedIndices = selectedList.getSelectedIndices();
-                            ArrayList<String> clientNames = new ArrayList<String>();
+                            ArrayList<String> clientNames = new ArrayList<>();
                             // Get all the selected items using the indices
-                            for (int i = 0; i < selectedIndices.length; i++) {
-                                clientNames.add(selectedList.getModel().getElementAt(selectedIndices[i]));
-                            }
-                            ArrayList<String> clientList = new ArrayList<String>();
-                            if(!clientList.isEmpty() && clientNames.get(0).equals("") && clientNames.size() == 1) {
-                                clientList.add(client.getUsername());
-                            }
-                            else {
-                                clientList = new ArrayList<String>(clientNames);
-                                clientList.add(client.getUsername());
+                            for (int i = 0; i < selectedList.getModel().getSize(); i++) {
+                                clientNames.add(selectedList.getModel().getElementAt(i));
                             }
 
-                            // TODO: We're not checking if clientList is empty for now or if the clients exist (assume client is right)
+                            if(!clientNames.contains(client.getUsername())) {
+                                clientNames.add(client.getUsername());
+                            }
+
                             client.setDocument(documentInput.getText());
+
 
                             try {
                                 //give the document name and client list to the server.
                                 client.transmit(new Pair(documentInput.getText(), false));
-                                client.transmit(clientList);
-                            } catch (IOException ex) {
+                                client.transmit(clientNames);
+                            }
+                            catch (IOException ex) {
                                 ex.printStackTrace();
                             }
                             dispose();
@@ -378,8 +374,7 @@ public class DocumentSelectionPage extends JFrame {
     }
 
     public String generateToken() {
-//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
-        String generatedString = "aaaa";
+        String generatedString = RandomStringUtils.randomAlphanumeric(10);
         return generatedString;
     }
 

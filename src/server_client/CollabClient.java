@@ -70,6 +70,8 @@ public class CollabClient implements CollabInterface {
 
 	private int numClientsInDocument;
 
+	public ArrayList<String> registeredUserList = new ArrayList<>();
+
 	/** port number of client */
 	private int port;
 	/** ip number of client */
@@ -188,6 +190,7 @@ public class CollabClient implements CollabInterface {
 			fileName = dir + "/doc-" + document + ".txt";
 			File documentStateFile = new File(fileName);
             documentStateFile.createNewFile();
+            xml = xs.toXML(documentState);
 			writeXMLToFile(documentStateFile, xml);
 
 			fileName = dir + "/sessions-" + document + ".txt";
@@ -474,11 +477,16 @@ public class CollabClient implements CollabInterface {
 		}
 		//The server is sending a list of sessioninfos.
 		else if (o instanceof ArrayList) {
-			try {
-				buildSessions((ArrayList<SessionInfo>) o);
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
+	        ArrayList lst = (ArrayList) o;
+	        Object elem = lst.get(0);
+	        if(elem instanceof SessionInfo)  {
+                try {
+                    buildSessions((ArrayList<SessionInfo>) o);
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
 		}
 		else {
             throw new RuntimeException("Unrecognized object type received by client");
@@ -706,6 +714,14 @@ public class CollabClient implements CollabInterface {
 		this.key = new SecretKeySpec(keyBytes, "AES");
 		this.cipherEnc.init(Cipher.ENCRYPT_MODE, this.key, ivSpec);
 		this.cipherDec.init(Cipher.DECRYPT_MODE, this.key, ivSpec);
+	}
+
+	public ArrayList<String> getUserList() throws IOException, ClassNotFoundException {
+		Object input = in.readObject();
+		if(!(input instanceof  ArrayList)) {
+			throw new IOException("Expected arraylist of registered users");
+		}
+		return (ArrayList<String>) input;
 	}
 
 	/** @return ip address of client */

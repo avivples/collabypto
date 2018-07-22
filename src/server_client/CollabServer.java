@@ -20,7 +20,7 @@ import javax.swing.text.BadLocationException;
 import document.*;
 import gui.ErrorDialog;
 import gui.ServerGui;
-//import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import signal.EncryptedMessage;
 import signal.RegistrationInfo;
 import signal.SessionInfo;
@@ -266,19 +266,31 @@ public class CollabServer implements CollabInterface {
                 throw new IOException("Expected client name");
             }
 
+            clientInfo.currentDocument = "";
+            ArrayList<String> clientDocuments = filteredDocumentList(clientName);
+            out.writeObject(clientDocuments);
+            out.flush();
+
             //Stays here waiting for the user to choose a document.
             while(true) {
-                clientInfo.currentDocument = "";
-                // Sends list of documents to client
-                ArrayList<String> clientDocuments = filteredDocumentList(clientName);
-                out.writeObject(clientDocuments);
-                out.flush();
 
                 // Receives which document to edit
                 input = in.readObject();
                 if(input instanceof String) {
-                    if(input.equals("refresh")) continue;
+                    if(input.equals("refresh")) {
+                        // Sends list of documents to client
+                        clientDocuments = filteredDocumentList(clientName);
+                        out.writeObject(clientDocuments);
+                        out.flush();
+
+                        continue;
+                    }
                     else tokens.add((String) input);
+                }
+
+                //client is requesting list of registered clients
+                else if(input instanceof  ArrayList) {
+                    out.writeObject(new ArrayList(clientInfos.keySet()));
                 }
 
                 //got document name + returning user boolean pair
@@ -298,9 +310,9 @@ public class CollabServer implements CollabInterface {
                     documents.add(documentID);
                     documentInstances.put(documentID, new DocumentInstance(""));
                     input = in.readObject();
-                    if (input instanceof String[]) {
-                        String[] clientList = (String[]) input;
-                        clientLists.put(documentID, (String[]) input);
+                    if (input instanceof ArrayList) {
+                        String[] clientList = ((ArrayList<String>)input).toArray(new String[0]);
+                        clientLists.put(documentID, clientList);
 
                         //build sessioninfo for document creator with the rest of the users. Assumes everyone is registered.
                         for(String client : clientList) {
@@ -411,8 +423,7 @@ public class CollabServer implements CollabInterface {
     }
 
     public String generateToken() {
-//        String generatedString = RandomStringUtils.randomAlphanumeric(10);
-        String generatedString = "aaaa";
+        String generatedString = RandomStringUtils.randomAlphanumeric(10);
         tokens.add(generatedString);
         return generatedString;
     }
