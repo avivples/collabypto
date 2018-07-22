@@ -217,14 +217,6 @@ public class ClientGui extends JPanel {
                 .addComponent(documentsListScrollPane));
         documentAreaPane.setLayout(documentsListGroupLayout);
 
-        JButton documentSelectButton = new JButton("Back to Document Selection");
-        documentSelectButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // TODO: add functionality
-            }
-        });
 
         JButton saveButton = new JButton("Download Text");
         saveButton.addActionListener(new ActionListener() {
@@ -244,7 +236,6 @@ public class ClientGui extends JPanel {
         JPanel rightPane = new JPanel(new BorderLayout());
         rightPane.add(documentAreaPane);
         rightPane.add(saveButton, BorderLayout.SOUTH);
-        rightPane.add(documentSelectButton, BorderLayout.PAGE_START);
         rightPane.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(""),
                 BorderFactory.createEmptyBorder(5, 5, 5, 5)));

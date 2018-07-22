@@ -362,8 +362,8 @@ public class CollabClient implements CollabInterface {
 			while (o != null) {
 			    parseInput(o);
 				o = in.readObject();
-
 			}
+
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (OperationEngineException e) {
@@ -402,6 +402,7 @@ public class CollabClient implements CollabInterface {
 				updateDoc(op);
 			} else if (plaintext instanceof ArrayList) {
 				// Updates list of current users and documents
+
 				ArrayList<String> users = (ArrayList<String>) plaintext;
 				ArrayList<String> documents = (ArrayList<String>) p.second;
 				this.gui.updateUsers(users.toArray());
@@ -478,16 +479,13 @@ public class CollabClient implements CollabInterface {
 		//The server is sending a list of sessioninfos.
 		else if (o instanceof ArrayList) {
 	        ArrayList lst = (ArrayList) o;
-	        Object elem = lst.get(0);
-	        if(elem instanceof SessionInfo)  {
-                try {
-                    buildSessions((ArrayList<SessionInfo>) o);
+				try {
+                    buildSessions(lst);
                 }
                 catch (Exception e) {
                     e.printStackTrace();
                 }
             }
-		}
 		else {
             throw new RuntimeException("Unrecognized object type received by client");
         }

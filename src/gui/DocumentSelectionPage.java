@@ -268,7 +268,6 @@ public class DocumentSelectionPage extends JFrame {
 
                             client.setDocument(documentInput.getText());
 
-
                             try {
                                 //give the document name and client list to the server.
                                 client.transmit(new Pair(documentInput.getText(), false));
@@ -278,9 +277,9 @@ public class DocumentSelectionPage extends JFrame {
                                 ex.printStackTrace();
                             }
                             dispose();
+                            f.dispose();
                         }
                     });
-
 
                     f.add(leftPanel, BorderLayout.WEST);
                     f.add(rightPanel, BorderLayout.EAST);
@@ -289,8 +288,9 @@ public class DocumentSelectionPage extends JFrame {
                     f.pack();
                     f.setVisible(true);
                 }
+
                 else {
-                    new ErrorDialog("Please Enter the name of the document");
+                    new ErrorDialog("Please enter the name of the document");
                 }
 
 			}
