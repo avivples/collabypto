@@ -12,10 +12,10 @@ import java.util.HashMap;
  * been done since the remote operation was received.
  * 
  */
-public class ClientStateTable {
+class ClientStateTable {
 
     // Stores all client states
-    private ArrayList<ClientState> cvt;
+    private final ArrayList<ClientState> cvt;
 
     /**
      * Create a ClientStateTable to store a table of states
@@ -54,7 +54,7 @@ public class ClientStateTable {
      *            Table size
      * @throws OperationEngineException
      */
-    public void growTo(int finalSize) throws OperationEngineException {
+    private void growTo(int finalSize) throws OperationEngineException {
         int l = cvt.size();
 
         for (ClientState state : cvt) {
@@ -77,7 +77,7 @@ public class ClientStateTable {
      * @param cv client state instance
      * @throws OperationEngineException
      */
-    public void setClientState(int client, ClientState cv)
+    private void setClientState(int client, ClientState cv)
             throws OperationEngineException {
         if (client >= 0) {
             if (this.cvt.size() <= client) {

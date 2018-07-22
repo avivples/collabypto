@@ -3,19 +3,25 @@ package server_client;
 import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import document.*;
-
-import gui.LoginPage;
-import org.apache.commons.lang3.StringUtils;
-import org.whispersystems.libsignal.protocol.CiphertextMessage;
-import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
-import org.whispersystems.libsignal.protocol.SignalMessage;
-import org.whispersystems.libsignal.state.*;
 import gui.ClientGui;
 import gui.DocumentSelectionPage;
 import gui.ErrorDialog;
+import org.apache.commons.lang3.StringUtils;
+import org.whispersystems.libsignal.*;
+import org.whispersystems.libsignal.protocol.CiphertextMessage;
+import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
+import org.whispersystems.libsignal.protocol.SignalMessage;
+import org.whispersystems.libsignal.state.PreKeyBundle;
+import org.whispersystems.libsignal.state.PreKeyRecord;
+import org.whispersystems.libsignal.state.SignedPreKeyRecord;
+import org.whispersystems.libsignal.state.impl.InMemorySignalProtocolStore;
+import org.whispersystems.libsignal.util.KeyHelper;
+import org.whispersystems.libsignal.util.Medium;
+import signal.ClientSessionCipher;
+import signal.EncryptedMessage;
+import signal.RegistrationInfo;
+import signal.SessionInfo;
 
-import javax.crypto.spec.IvParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
 import java.io.*;
@@ -23,24 +29,10 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
-
-import org.whispersystems.libsignal.*;
-import org.whispersystems.libsignal.state.impl.InMemorySignalProtocolStore;
-import org.whispersystems.libsignal.util.KeyHelper;
-import org.whispersystems.libsignal.util.Medium;
-import signal.ClientSessionCipher;
-import signal.RegistrationInfo;
-import signal.SessionInfo;
-import signal.EncryptedMessage;
-
-import javax.crypto.*;
 
 /**
  * This is the client that will connect to a server. A unique instance of the
@@ -51,13 +43,13 @@ import javax.crypto.*;
  * algorithm to correctly update its own document. All of this will be reflected
  * on the GUI.
  *
- *
  * Passing these tests ensure that our client is able to display the latest
  * version of the document while a user is adding new text.
  *
  * @author youyanggu
- *
  */
+
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class CollabClient implements CollabInterface {
     /** Timeout on socket connection attempts */
     private static final int TIMEOUT = 2000;
@@ -67,21 +59,17 @@ public class CollabClient implements CollabInterface {
 	private String document = "";
 	/** list of clients current doc is shared with */
 
-	// storing the session ciphers documentname -> array of ciphers
+	//storing the session ciphers documentname -> array of ciphers
 	private HashMap<String, ArrayList<ClientSessionCipher>> sessionCiphers = new HashMap<>();
 
-	private int numClientsInDocument;
-
-	public ArrayList<String> registeredUserList = new ArrayList<>();
-
 	/** port number of client */
-	private int port;
+	private final int port;
 	/** ip number of client */
-	private String ip;
+	private final String ip;
 
-	private String serverName;
+	private final String serverName;
 
-	private String dir;
+	private final String dir;
 	/** username of client */
 	private String name;
 
@@ -89,7 +77,7 @@ public class CollabClient implements CollabInterface {
 	private DocumentState documentState = new DocumentState("", null);
 
 	/** label to display at the top of the document GUI */
-	protected String label = "Client";
+    private String label = "Client";
 	/** Intializes socket and streams to null */
 	private Socket s = null;
 
@@ -97,27 +85,16 @@ public class CollabClient implements CollabInterface {
 	private String errorMessage = "Server Disconnected.";
 
 	/** outputstream to send objects to server */
-	protected ObjectOutputStream out = null;
+    private ObjectOutputStream out = null;
 	/** inputstream to receive objects from server */
-	protected ObjectInputStream in = null;
+    private ObjectInputStream in = null;
 	/** client GUI used to display the document */
-	protected ClientGui gui;
+    private ClientGui gui;
 
-	protected InMemorySignalProtocolStore clientStore;
-
-	// for demo purposes each client can create one document
-	protected Cipher cipherEnc;
-
-	protected Cipher cipherDec;
-
-	protected SecretKey key;
-
-	// TODO: Remove ALL AES stuff
-	byte[] keyBytes;
-	byte[] iv;
+	private InMemorySignalProtocolStore clientStore;
 
 	public enum ENCRYPTION_METHOD {
-		NONE, AES, SIGNAL
+		NONE, SIGNAL
 	}
 
 	/**
@@ -146,15 +123,12 @@ public class CollabClient implements CollabInterface {
             this.connect();
         } catch (IOException e) {
             new ErrorDialog(e.toString());
-        } catch (InvalidKeyException e) {
-			e.printStackTrace();
-		}
+        }
 	}
 
 
     //Creates a list of bundles to pass to the server, so the server can create sessions with other users.
 	private RegistrationInfo register () throws InvalidKeyException {
-		// TODO: At some point add authentication and also local store instead of only memory store
 		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
 		int registrationId  = KeyHelper.generateRegistrationId(true);
 		int startId = new Random().nextInt(Medium.MAX_VALUE);
@@ -170,8 +144,7 @@ public class CollabClient implements CollabInterface {
 			pK.serialize();
 		}
 		clientStore.storeSignedPreKey(signedPreKey.getId(), signedPreKey);
-		RegistrationInfo registrationInfo = new RegistrationInfo(preKeyBundles);
-		return registrationInfo;
+		return new RegistrationInfo(preKeyBundles);
 	}
 
 	// write information on exit to load when client rejoins
@@ -194,6 +167,7 @@ public class CollabClient implements CollabInterface {
 			DocumentState documentState = new DocumentState(gui.getCollabModel().getDocumentText(), gui.getCollabModel().copyOfCV());
 			fileName = dir + "/doc-" + document + ".txt";
 			File documentStateFile = new File(fileName);
+            //noinspection ResultOfMethodCallIgnored
             documentStateFile.createNewFile();
             xml = xs.toXML(documentState);
 			writeXMLToFile(documentStateFile, xml);
@@ -231,7 +205,7 @@ public class CollabClient implements CollabInterface {
 		return true;
 	}
 
-	public boolean readDocument() throws IOException, OperationEngineException {
+	public boolean readDocument() throws IOException {
 		Class<?>[] classes = new Class[] {DocumentState.class, HashMap.class, ClientSessionCipher.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
@@ -257,9 +231,7 @@ public class CollabClient implements CollabInterface {
 		byte[] data = new byte[(int) file.length()];
 		fis.read(data);
 		fis.close();
-
-		String str = new String(data);
-		return str;
+		return new String(data);
 	}
 
 	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
@@ -290,7 +262,7 @@ public class CollabClient implements CollabInterface {
 	 * @throws OperationEngineException if the operation caused an exception when being processed by
      * the operation engine
 	 */
-	public void connect() throws IOException, InvalidKeyException {
+    private void connect() throws IOException {
 	    // Establishes a socket connection
 		System.out.println("Connecting to port: " + this.port + " at: " + this.ip);
 		InetSocketAddress address = new InetSocketAddress(this.ip, this.port);
@@ -322,7 +294,7 @@ public class CollabClient implements CollabInterface {
                     transmit(new Pair(this.name, register()));
                 }
                 else {
-                    transmit(new Pair(this.name, new Boolean(true))); //send that we already registered
+                    transmit(new Pair(this.name, true)); //send that we already registered
                 }
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -385,9 +357,7 @@ public class CollabClient implements CollabInterface {
 			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
-		} catch (OperationEngineException e) {
-			e.printStackTrace();
-		} finally {
+		}  finally {
 		    // Close connection
 			JOptionPane.showMessageDialog(null, errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
 
@@ -403,11 +373,9 @@ public class CollabClient implements CollabInterface {
 	 * to its type. Performs the appropriate calls and updates based on the object received
 	 * @param o - object sent from the server to parse
 	 * @throws IOException - caused if the operation object is corrupt, or if the socket connection breaks
-	 * @throws OperationEngineException - if the operation caused an exception when being processed by
-	 * the operation engine
-	 */
+     */
 	@SuppressWarnings("unchecked")
-    public void parseInput(Object o) throws IOException, OperationEngineException {
+    private void parseInput(Object o) throws IOException {
 	    //the server mostly sends pairs to the client - with an operation and its order, or a pair of the list of documents and list of users, or with a history of operations and document instance.
 	    if (o instanceof Pair) {
 	    	Pair p = (Pair) o;
@@ -427,7 +395,6 @@ public class CollabClient implements CollabInterface {
 				this.gui.updateDocumentsList(documents.toArray());
 			} else if (plaintext instanceof DocumentInstance) {
 			    //we got history and documentinstance from the server, so update this user to the current state using the history.
-				DocumentInstance documentInstance = (DocumentInstance) plaintext;
 				ArrayList<EncryptedMessage> history = (ArrayList) p.second;
 				if (history.size() > 0) {
 					documentState.documentText = updateFromHistory(history, documentState.documentText);
@@ -527,16 +494,15 @@ public class CollabClient implements CollabInterface {
 	}
 
 
-	private Object encrypt(Object plaintext) throws IOException, UntrustedIdentityException {
-		if(numClientsInDocument == 1) return null;
+	private void encrypt(Object plaintext) throws IOException, UntrustedIdentityException {
 		Class<?>[] classes = new Class[] { Operation.class};
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
 		xs.allowTypes(classes);
 		int i = 0;
 		//find the appropriate sessioncipher to encrypt with
-		ClientSessionCipher clientSessionCipher = null;
-		if(sessionCiphers.get(document) == null) return null;
+		ClientSessionCipher clientSessionCipher;
+		if(sessionCiphers.get(document) == null) return;
 		EncryptedMessage[] messages = new EncryptedMessage[sessionCiphers.get(document).size()];
 		for(ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
 			clientSessionCipher = sessionCipher;
@@ -553,7 +519,6 @@ public class CollabClient implements CollabInterface {
 
 		out.writeObject(messages);
 		out.flush();
-		return plaintext;
 	}
 
 	private Operation decrypt(EncryptedMessage signalMessage) throws DuplicateMessageException, InvalidMessageException, UntrustedIdentityException, LegacyMessageException, InvalidVersionException, InvalidKeyException, InvalidKeyIdException {
@@ -587,8 +552,8 @@ public class CollabClient implements CollabInterface {
 		//convert the bytes to the xml message that the sent operation was converted to
 		String xml = new String(plaintext);
 		//convert the xml message to the operation that was sent
-		Operation op = (Operation) xs.fromXML(xml);
-		return op;
+
+		return(Operation) xs.fromXML(xml);
 	}
 	/**
 	 * Updates the client's copy of the document using operational transform
@@ -601,21 +566,19 @@ public class CollabClient implements CollabInterface {
 		try {
 			if (getID() == o.getSiteId()) return;
 			if (o instanceof InsertOperation) {
-				this.gui.getCollabModel().remoteOp((Operation) o, true);
+				this.gui.getCollabModel().remoteOp(o, true);
 			} else if (o instanceof DeleteOperation) {
-				this.gui.getCollabModel().remoteOp((Operation) o, false);
+				this.gui.getCollabModel().remoteOp(o, false);
 			} else {
 				throw new RuntimeException("Shouldn't reach here");
 			}
 		} catch (OperationEngineException e) {
 			new ErrorDialog(e.toString());
-		} catch (BadLocationException e) {
-			new ErrorDialog(e.toString());
 		}
 	}
 
 	//simulates the history of operations on a stringbuilder to quickly get to the current document state.
-	public String updateFromHistory(ArrayList<EncryptedMessage> history, String text) throws OperationEngineException {
+    private String updateFromHistory(ArrayList<EncryptedMessage> history, String text) {
 		StringBuilder doc = new StringBuilder();
 		Operation[] operations = new Operation[history.size()];
 		int i = 0;
@@ -632,7 +595,7 @@ public class CollabClient implements CollabInterface {
 			doc.append(text);
 			for (i = 0; i < operations.length - 1; i++) {
 					Operation op = operations[i];
-					op.setOrder(i); //TODO: CHECK
+					op.setOrder(i);
 				if (op.getKey().equals(document)) {
 					if (op instanceof InsertOperation) {
 						//if(doc.length() < op.getOffset()) doc.append(op.getValue());
@@ -675,14 +638,6 @@ public class CollabClient implements CollabInterface {
 				out.writeObject(o);
 				out.flush();
 				break;
-			case AES:
-				try {
-					//encryptAES(o);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				//			out.flush();
-				break;
 			case SIGNAL:
 				try {
 					encrypt(o);
@@ -716,21 +671,6 @@ public class CollabClient implements CollabInterface {
 		this.document = text;
 	}
 
-	public void setCipher() throws NoSuchPaddingException, NoSuchAlgorithmException,
-			java.security.InvalidKeyException, InvalidAlgorithmParameterException {
-		SecureRandom random = new SecureRandom();
-		this.keyBytes = new byte[16];
-		this.iv = new byte[16];
-		random.nextBytes(keyBytes);
-		random.nextBytes(iv);
-		IvParameterSpec ivSpec = new IvParameterSpec(iv);
-		this.cipherEnc = Cipher.getInstance("AES/CBC/PKCS5Padding");
-		this.cipherDec = Cipher.getInstance("AES/CBC/PKCS5Padding");
-		this.key = new SecretKeySpec(keyBytes, "AES");
-		this.cipherEnc.init(Cipher.ENCRYPT_MODE, this.key, ivSpec);
-		this.cipherDec.init(Cipher.DECRYPT_MODE, this.key, ivSpec);
-	}
-
 	public ArrayList<String> getUserList() throws IOException, ClassNotFoundException {
 		Object input = in.readObject();
 		if(!(input instanceof  ArrayList)) {
@@ -739,46 +679,9 @@ public class CollabClient implements CollabInterface {
 		return (ArrayList<String>) input;
 	}
 
-	/** @return ip address of client */
-	public String getIP() {
-	    return this.ip;
-	}
-
-	/** @return port number of client */
-	public int getPort() {
-	    return this.port;
-	}
-
 	/** @return username of client */
 	public String getUsername() {
 	    return this.name;
 	}
-
-
-/*
-	private Object decryptAES(Object cipherText) throws IOException, BadPaddingException, IllegalBlockSizeException {
-		CipherInputStream cipherInputStream = new CipherInputStream(in, cipherDec);
-		ObjectInputStream inputStream = new ObjectInputStream(cipherInputStream);
-		SealedObject sealedObject;
-		try {
-			sealedObject = (SealedObject) inputStream.readObject();
-			return sealedObject.getObject(cipherDec);
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
-
-	private void encryptAES(Object plaintext) throws IOException, IllegalBlockSizeException, java.security.InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException, BadPaddingException, ClassNotFoundException {
-		String transformation = "AES/CBC/PKCS5Padding";
-		SecretKeySpec sks = new SecretKeySpec(keyBytes, "AES");
-		cipherEnc = Cipher.getInstance(transformation);
-		cipherEnc.init(Cipher.ENCRYPT_MODE, sks);
-		SealedObject sealedObject = new SealedObject((Serializable)plaintext, cipherEnc);
-		// Wrap the output stream
-		out.writeObject(sealedObject);
-		out.flush();
-	}
-*/
 
 }

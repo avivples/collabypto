@@ -13,16 +13,16 @@ import java.util.Comparator;
  * Since each client has his/her own history buffer, and there is no shared memory,
  * this code should be thread safe.
  */
-public class HistoryBuffer {
+class HistoryBuffer {
 
 
     // Stores all processed operations of the client
-    private HashMap<String, Operation> ops;
+    private final HashMap<String, Operation> ops;
     // Number of processed operations
-    private int size = 0;
+    private int size ;
 
     public HistoryBuffer() {
-        this.ops = new HashMap<String, Operation>();
+        this.ops = new HashMap<>();
         this.size = 0;
     }
 

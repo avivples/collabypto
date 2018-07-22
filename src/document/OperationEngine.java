@@ -15,7 +15,7 @@ public class OperationEngine {
 
 
     // Represents the client ID of this Operation Engine
-    private int siteId;
+    private final int siteId;
     // Local state machine (context vector)
     private ClientState cs;
     // use to know what state every other client is in
@@ -25,7 +25,7 @@ public class OperationEngine {
     // History buffer to keep track of previously processed operations
     private HistoryBuffer historybuffer;
     // Number of clients currently connected in the network
-    private int siteCount = 1;
+    private final int siteCount = 1;
 
     /**
      * Creates an OperationEngine object with controls the entire OT algorithm.
@@ -42,12 +42,11 @@ public class OperationEngine {
 
     @Override
     public String toString() {
-        String s = "{siteId : " + siteId +
-                   ",ClientState : " + this.cs +
-                   ",ClientStaterTable : " + this.cst +
-                   ",HistoryBuffer : " + this.historybuffer +
-                   ",ClientCount : " + this.siteCount + "}";
-        return s;
+        return "{siteId : " + siteId +
+                ",ClientState : " + this.cs +
+                ",ClientStaterTable : " + this.cst +
+                ",HistoryBuffer : " + this.historybuffer +
+                ",ClientCount : " + this.siteCount + "}";
     }
 
     /**
@@ -75,8 +74,8 @@ public class OperationEngine {
      * @return operation instance matching the given type
      * @throws OperationEngineException
      */
-    public Operation createOp(boolean local, String key, String value, String type, int offset,
-                              int site, int[] cv, int order) throws OperationEngineException {
+    private Operation createOp(boolean local, String key, String value, String type, int offset,
+                               int site, int[] cv, int order) throws OperationEngineException {
         Map<String, Object> properties = new HashMap<String, Object>();
         if (local) {
             properties.put("key", key);
@@ -122,7 +121,7 @@ public class OperationEngine {
      * @param op local operation
      * @return op
      */
-    public Operation pushLocalOp(Operation op) {
+    private Operation pushLocalOp(Operation op) {
         this.cs.setSeqForClient(op.getSiteId(), op.getSeqId());
         this.historybuffer.addLocalOperation(op);
         return op;
@@ -165,7 +164,7 @@ public class OperationEngine {
      * @param op operation to check
      * @return True iff the engine already processed this operation
      */
-    public boolean hasProcessedOp(Operation op) {
+    private boolean hasProcessedOp(Operation op) {
         int seqId = this.cs.getSeqForClient(op.getSiteId());
         return (seqId >= op.getSeqId());
     }

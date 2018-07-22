@@ -12,9 +12,9 @@ import java.util.Vector;
 public class StateDifference {
 
     // Holds client IDs
-    public Vector<Integer> clients;
+    public final Vector<Integer> clients;
     // Holds IDs for operations
-    public Vector<Integer> sequenceID;
+    private final Vector<Integer> sequenceID;
 
     /**
      * This is the constructor for the context difference. We have two vectors:

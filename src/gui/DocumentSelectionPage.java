@@ -15,7 +15,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 
 /**
@@ -33,11 +32,11 @@ public class DocumentSelectionPage extends JFrame {
 
 
     // Holds the list of documents to display
-	private JList listOfDocument;
-	private DefaultListModel listDocumentModel;
+	private final JList listOfDocument;
+	private final DefaultListModel listDocumentModel;
 	// Holds name of created document
-	private JTextArea documentInput;
-	private CollabClient client;
+	private final JTextArea documentInput;
+	private final CollabClient client;
 
 
 	/**
@@ -99,47 +98,37 @@ public class DocumentSelectionPage extends JFrame {
 		documentScrollPane.setAutoscrolls(true);
 
 		JButton selectButton = new JButton(SELECT_BUTTON);
-		selectButton.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				int index = listOfDocument.getSelectedIndex();
-				if (index != -1) {
-					String docName = (String) listDocumentModel.get(index);
-					client.setDocument(docName);
-					try {
-						client.transmit(new Pair(docName, client.readDocument()));
-					} catch (IOException e1) {
-						e1.printStackTrace();
-					} catch (OperationEngineException e1) {
-						e1.printStackTrace();
-					}
-					dispose();
-				} else {
-					new ErrorDialog(
-							"Please select the document you want to edit");
-				}
-			}
-		});
+		selectButton.addActionListener(e -> {
+            int index = listOfDocument.getSelectedIndex();
+            if (index != -1) {
+                String docName = (String) listDocumentModel.get(index);
+                client.setDocument(docName);
+                try {
+                    client.transmit(new Pair(docName, client.readDocument()));
+                } catch (IOException e1) {
+                    e1.printStackTrace();
+                }
+                dispose();
+            } else {
+                new ErrorDialog(
+                        "Please select the document you want to edit");
+            }
+        });
 
 		JButton refreshButton = new JButton(REFRESH_BUTTON);
-		refreshButton.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				try {
-					//asks the server for the list of documents.
-					client.transmit("refresh");
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-				try {
-					updateDocumentsList(client.readNewDocumentsList());
-				} catch (IOException | ClassNotFoundException e1) {
-					e1.printStackTrace();
-				}
-			}
-		});
+		refreshButton.addActionListener(e -> {
+            try {
+                //asks the server for the list of documents.
+                client.transmit("refresh");
+            } catch (IOException e1) {
+                e1.printStackTrace();
+            }
+            try {
+                updateDocumentsList(client.readNewDocumentsList());
+            } catch (IOException | ClassNotFoundException e1) {
+                e1.printStackTrace();
+            }
+        });
 
 		leftPane.add(label, BorderLayout.PAGE_START);
 		leftPane.add(documentScrollPane, BorderLayout.CENTER);
@@ -158,153 +147,143 @@ public class DocumentSelectionPage extends JFrame {
 		documentInput.setMinimumSize(new Dimension(10, 10));
 
 		JButton newDocumentButton = new JButton(NEW_DOCUMENT);
-        newDocumentButton.addActionListener(new ActionListener() {
+        newDocumentButton.addActionListener(arg0 -> {
+            if (documentInput.getText().length() > 0) {
 
-            @Override
-            public void actionPerformed(ActionEvent arg0) {
-                if (documentInput.getText().length() > 0) {
-
-                    // TODO: need to check all the documents on the server - not just unique to the user
-                    // TODO: check shouldn't be on the client side
-                    // Check if document name already exists
-                    ListModel model = listOfDocument.getModel();
-                    for(int i = 0; i < model.getSize(); i++) {
-                        String doc = (String) model.getElementAt(i);
-                        if(documentInput.getText().equals(doc)) {
-                            new ErrorDialog("Document name already exists! Please enter a new name.");
-                            return;
-                        }
+                // TODO: need to check all the documents on the server - not just unique to the user
+                // TODO: check shouldn't be on the client side
+                // Check if document name already exists
+                ListModel model = listOfDocument.getModel();
+                for(int i = 0; i < model.getSize(); i++) {
+                    String doc = (String) model.getElementAt(i);
+                    if(documentInput.getText().equals(doc)) {
+                        new ErrorDialog("Document name already exists! Please enter a new name.");
+                        return;
                     }
+                }
 
-                    //when the client creates a new document, we ask them to provide the list of clients that can access the document.
-                    ArrayList<String> userList = new ArrayList<>();
-                    try {
-                        client.transmit(userList);
-                        userList = client.getUserList();
-                        userList.remove(client.getUsername());
+                //when the client creates a new document, we ask them to provide the list of clients that can access the document.
+                ArrayList<String> userList = new ArrayList<>();
+                try {
+                    client.transmit(userList);
+                    userList = client.getUserList();
+                    userList.remove(client.getUsername());
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
+                } catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
+                JFrame f = new JFrame("Invite Users");
+                JPanel leftPanel = new JPanel();
+                leftPanel.setLayout(new BorderLayout());
+                leftPanel.setPreferredSize(new Dimension(400, 200));
+                leftPanel.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createTitledBorder(""),
+                        BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+
+                DefaultListModel availModel = new DefaultListModel();
+                for(String u : userList) availModel.addElement(u);
+                sortListModel(availModel);
+                JLabel avail = new JLabel("Available Users");
+                JList<String> availList = new JList(availModel);
+                leftPanel.add(avail, BorderLayout.PAGE_START);
+                leftPanel.add(new JScrollPane(availList), BorderLayout.CENTER);
+
+                JPanel rightPanel = new JPanel();
+                rightPanel.setLayout(new BorderLayout());
+                rightPanel.setPreferredSize(new Dimension(400, 200));
+                rightPanel.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createTitledBorder(""),
+                        BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+                JLabel selected = new JLabel("Selected Users");
+
+                DefaultListModel selectedModel = new DefaultListModel();
+                JList<String> selectedList = new JList(selectedModel);
+                rightPanel.add(selected, BorderLayout.PAGE_START);
+                rightPanel.add(new JScrollPane(selectedList), BorderLayout.CENTER);
+
+
+                JButton add = new JButton("Add");
+                JButton remove = new JButton("Remove");
+
+                add.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        int index = availList.getSelectedIndex();
+                        String name = availList.getSelectedValue();
+                        availModel.remove(index);
+                        selectedModel.addElement(name);
                     }
-                    catch (IOException e) {
-                        e.printStackTrace();
-                    } catch (ClassNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                    JFrame f = new JFrame("Invite Users");
-                    JPanel leftPanel = new JPanel();
-                    leftPanel.setLayout(new BorderLayout());
-                    leftPanel.setPreferredSize(new Dimension(400, 200));
-                    leftPanel.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createTitledBorder(""),
-                            BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+                });
 
-                    DefaultListModel availModel = new DefaultListModel();
-                    for(String u : userList) availModel.addElement(u);
-                    sortListModel(availModel);
-                    JLabel avail = new JLabel("Available Users");
-                    JList<String> availList = new JList(availModel);
-                    leftPanel.add(avail, BorderLayout.PAGE_START);
-                    leftPanel.add(new JScrollPane(availList), BorderLayout.CENTER);
-
-                    JPanel rightPanel = new JPanel();
-                    rightPanel.setLayout(new BorderLayout());
-                    rightPanel.setPreferredSize(new Dimension(400, 200));
-                    rightPanel.setBorder(BorderFactory.createCompoundBorder(
-                            BorderFactory.createTitledBorder(""),
-                            BorderFactory.createEmptyBorder(10, 10, 10, 10)));
-                    JLabel selected = new JLabel("Selected Users");
-
-                    DefaultListModel selectedModel = new DefaultListModel();
-                    JList<String> selectedList = new JList(selectedModel);
-                    rightPanel.add(selected, BorderLayout.PAGE_START);
-                    rightPanel.add(new JScrollPane(selectedList), BorderLayout.CENTER);
-
-
-                    JButton add = new JButton("Add");
-                    JButton remove = new JButton("Remove");
-
-                    add.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            int index = availList.getSelectedIndex();
-                            String name = availList.getSelectedValue();
-                            availModel.remove(index);
-                            selectedModel.addElement(name);
-                        }
-                    });
-
-                    remove.addActionListener(new ActionListener() {
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            int index = selectedList.getSelectedIndex();
-                            String name = selectedList.getSelectedValue();
-                            selectedModel.remove(index);
-                            availModel.addElement(name);
+                remove.addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        int index = selectedList.getSelectedIndex();
+                        String name = selectedList.getSelectedValue();
+                        selectedModel.remove(index);
+                        availModel.addElement(name);
 //                            sortListModel(availModel);
+                    }
+                });
+
+                JPanel subPanel1 = new JPanel();
+
+                subPanel1.setLayout(new GridBagLayout());
+                GridBagConstraints gbc = new GridBagConstraints();
+                gbc.gridwidth = GridBagConstraints.REMAINDER;
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+
+                subPanel1.add(add, gbc);
+                subPanel1.add(remove, gbc);
+
+                JButton inviteButton = new JButton("Send Document Invites");
+                inviteButton.addActionListener(new ActionListener() {
+
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        ArrayList<String> clientNames = new ArrayList<>();
+                        // Get all the selected items using the indices
+                        for (int i = 0; i < selectedList.getModel().getSize(); i++) {
+                            clientNames.add(selectedList.getModel().getElementAt(i));
                         }
-                    });
 
-                    JPanel subPanel = new JPanel();
-
-                    subPanel.setLayout(new GridBagLayout());
-                    GridBagConstraints gbc = new GridBagConstraints();
-                    gbc.gridwidth = GridBagConstraints.REMAINDER;
-                    gbc.fill = GridBagConstraints.HORIZONTAL;
-
-                    subPanel.add(add, gbc);
-                    subPanel.add(remove, gbc);
-
-                    JButton inviteButton = new JButton("Send Document Invites");
-                    inviteButton.addActionListener(new ActionListener() {
-
-                        @Override
-                        public void actionPerformed(ActionEvent e) {
-                            ArrayList<String> clientNames = new ArrayList<>();
-                            // Get all the selected items using the indices
-                            for (int i = 0; i < selectedList.getModel().getSize(); i++) {
-                                clientNames.add(selectedList.getModel().getElementAt(i));
-                            }
-
-                            if(!clientNames.contains(client.getUsername())) {
-                                clientNames.add(client.getUsername());
-                            }
-
-                            client.setDocument(documentInput.getText());
-
-                            try {
-                                //give the document name and client list to the server.
-                                client.transmit(new Pair(documentInput.getText(), false));
-                                client.transmit(clientNames);
-                            }
-                            catch (IOException ex) {
-                                ex.printStackTrace();
-                            }
-                            dispose();
-                            f.dispose();
+                        if(!clientNames.contains(client.getUsername())) {
+                            clientNames.add(client.getUsername());
                         }
-                    });
 
-                    f.add(leftPanel, BorderLayout.WEST);
-                    f.add(rightPanel, BorderLayout.EAST);
-                    f.add(inviteButton, BorderLayout.PAGE_END);
-                    f.add(subPanel, BorderLayout.CENTER);
-                    f.pack();
-                    f.setVisible(true);
-                }
+                        client.setDocument(documentInput.getText());
 
-                else {
-                    new ErrorDialog("Please enter the name of the document");
-                }
+                        try {
+                            //give the document name and client list to the server.
+                            client.transmit(new Pair(documentInput.getText(), false));
+                            client.transmit(clientNames);
+                        }
+                        catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                        dispose();
+                        f.dispose();
+                    }
+                });
 
-			}
+                f.add(leftPanel, BorderLayout.WEST);
+                f.add(rightPanel, BorderLayout.EAST);
+                f.add(inviteButton, BorderLayout.PAGE_END);
+                f.add(subPanel1, BorderLayout.CENTER);
+                f.pack();
+                f.setVisible(true);
+            }
 
-		});
+            else {
+                new ErrorDialog("Please enter the name of the document");
+            }
+
+        });
 
         JButton generateTokenButton = new JButton(GENERATE_TOKENS);
-        generateTokenButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent arg0) {
-                generateTokenGUI();
-            }
-        });
+        generateTokenButton.addActionListener(arg0 -> generateTokenGUI());
 
         rightPane.add(label2, BorderLayout.PAGE_START);
 		rightPane.add(documentInput, BorderLayout.CENTER);
@@ -332,7 +311,7 @@ public class DocumentSelectionPage extends JFrame {
 		this.revalidate();
 	}
 
-    public void generateTokenGUI() {
+    private void generateTokenGUI() {
         JFrame f = new JFrame("Create Invite");
         JPanel mainPanel = new JPanel();
         mainPanel.setLayout(new FlowLayout());
@@ -353,30 +332,25 @@ public class DocumentSelectionPage extends JFrame {
         f.setVisible(true);
         JLabel copied = new JLabel("Token copied to clipboard! Send token to invite!");
 
-        button.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String token = generateToken();
-                try {
-                    client.transmit(token);
-                } catch (IOException e1) {
-                    e1.printStackTrace();
-                }
-                text.setText(token);
-                StringSelection stringSelection = new StringSelection(token);
-                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                clipboard.setContents(stringSelection, null);
-                mainPanel.add(copied);
-                f.revalidate();
-                f.repaint();
+        button.addActionListener(e -> {
+            String token1 = generateToken();
+            try {
+                client.transmit(token1);
+            } catch (IOException e1) {
+                e1.printStackTrace();
             }
+            text.setText(token1);
+            StringSelection stringSelection = new StringSelection(token1);
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(stringSelection, null);
+            mainPanel.add(copied);
+            f.revalidate();
+            f.repaint();
         });
     }
 
-    public String generateToken() {
-        String generatedString = RandomStringUtils.randomAlphanumeric(10);
-        return generatedString;
+    private String generateToken() {
+        return RandomStringUtils.randomAlphanumeric(10);
     }
 
     private void sortListModel(DefaultListModel<String> listModel) {

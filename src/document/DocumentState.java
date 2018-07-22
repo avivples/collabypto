@@ -2,7 +2,7 @@ package document;
 
 public class DocumentState  {
     public String documentText;
-    public ClientState contextVector;
+    public final ClientState contextVector;
 
     public DocumentState(String documentText, ClientState contextVector)
     {

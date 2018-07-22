@@ -7,7 +7,7 @@ import java.io.Serializable;
 public class DocumentInstance implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    public String document;
+    private final String document;
     public DocumentInstance(String document) {
         this.document = document;
     }

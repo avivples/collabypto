@@ -3,11 +3,8 @@ package gui;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.InputEvent;
-import java.awt.event.KeyEvent;
 
 import javax.swing.Action;
 import javax.swing.BorderFactory;
@@ -42,9 +39,7 @@ import controller.UnDoAction;
 import document.OperationEngineException;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.Arrays;
 
 /**
  * The main GUI of the client and server. This GUI will pop off after the user
@@ -58,41 +53,32 @@ public class ClientGui extends JPanel {
     private static final long serialVersionUID = -2826617458739559881L;
 
     // Initial test of the document
-    private String init;
+    private final String init;
     // Client's label
     private final String label;
 
     // Holds the document area
-    protected JTextPane textArea;
-    protected JButton undoButton;
-    protected JButton redoButton;
+    private JTextPane textArea;
+    private JButton undoButton;
+    private JButton redoButton;
 
     // Copy button
-    protected JButton copyButton;
+    private JButton copyButton;
     // Paste button
-    protected JButton pasteButton;
+    private JButton pasteButton;
     // Cut Paste
-    protected JButton cutButton;
+    private JButton cutButton;
     // Holds list of all users currently editing the document
-    protected JList userList;
+    private JList userList;
     // List all the documents the user has access to
-    protected JList documentList;
+    private JList documentList;
 
     // Model to store the current state of hte document
     private CollabModel collabModel;
 
-    protected JPanel wholePane;
-    protected DefaultListModel listModel;
+    private JPanel wholePane;
+    private DefaultListModel listModel;
     private DefaultListModel documentListModel;
-
-    /**
-     * Create GUI for the client
-     */
-    public ClientGui(String init, String label) {
-        this.label = label;
-        this.init = init;
-        createGUI();
-    }
 
     /**
      * Create GUI for the client
@@ -168,11 +154,11 @@ public class ClientGui extends JPanel {
         Action redoAction = new RedoAction(manager);
         redoButton.addActionListener(redoAction);
         this.registerKeyboardAction(undoAction,
-                KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_MASK),
-                JComponent.WHEN_FOCUSED);
+                KeyStroke.getKeyStroke("control Z"),
+                JComponent.WHEN_IN_FOCUSED_WINDOW);
         this.registerKeyboardAction(redoAction,
-                KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_MASK),
-                JComponent.WHEN_FOCUSED);
+                KeyStroke.getKeyStroke("control Y"),
+                JComponent.WHEN_IN_FOCUSED_WINDOW);
 
         JScrollPane areaScrollPane = new JScrollPane(textArea);
         areaScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
@@ -219,17 +205,13 @@ public class ClientGui extends JPanel {
 
 
         JButton saveButton = new JButton("Download Text");
-        saveButton.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String text = textArea.getText();
-                String documentName = label.split(": ")[1];
-                try (PrintWriter out = new PrintWriter(documentName + ".txt")) {
-                    out.println(text);
-                } catch (FileNotFoundException e1) {
-                    e1.printStackTrace();
-                }
+        saveButton.addActionListener(e -> {
+            String text = textArea.getText();
+            String documentName = label.split(": ")[1];
+            try (PrintWriter out = new PrintWriter(documentName + ".txt")) {
+                out.println(text);
+            } catch (FileNotFoundException e1) {
+                e1.printStackTrace();
             }
         });
 

@@ -67,7 +67,7 @@ public class ClientState implements Serializable {
     /**
      * Makes a copy of the array in this ClientState.
      */
-    public int[] copyClients() {
+    private int[] copyClients() {
         return Arrays.copyOf(this.clients, this.clients.length);
     }
 

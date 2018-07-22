@@ -24,12 +24,12 @@ public abstract class Operation implements Serializable {
     // Type of operation: insert or delete
     String type;
     // State machine of client who created operation
-    ClientState clientState = null;
+    private ClientState clientState = null;
 
     // Denotes if operation was performed locally
-    boolean local = false;
+    private boolean local = false;
     // Document where operation is made
-    protected String key = null;
+    String key = null;
 
     // String being inserted
     String value = null;
@@ -42,7 +42,7 @@ public abstract class Operation implements Serializable {
     boolean immutable;
 
     // Store referenceable operations
-    Vector<Operation> xCache = null;
+    private Vector<Operation> xCache = null;
 
     /**
      * Create a new operation specified by the type (insert or delete)
@@ -76,15 +76,14 @@ public abstract class Operation implements Serializable {
 
     @Override
     public String toString() {
-        String b = ("{siteId : " + this.siteId) +
-                    ",seqId : " + this.seqId +
-                    ",type :" + type +
-                    ",contextVector : " + this.clientState +
-                    ",key : " + this.key +
-                    ",position : " + this.offset +
-                    ",value : " + this.value +
-                    ",order : " + this.getOrder() + "}";
-        return b;
+        return ("{siteId : " + this.siteId) +
+                ",seqId : " + this.seqId +
+                ",type :" + type +
+                ",contextVector : " + this.clientState +
+                ",key : " + this.key +
+                ",position : " + this.offset +
+                ",value : " + this.value +
+                ",order : " + this.getOrder() + "}";
     }
 
     /**
@@ -161,9 +160,9 @@ public abstract class Operation implements Serializable {
      * @param op operation
      * @return a new operation that is transformed after specified operation is applied
      */
-    public abstract Operation transformWithDelete(Operation op);
+    protected abstract Operation transformWithDelete(Operation op);
 
-    public abstract Operation transformWithInsert(Operation op);
+    protected abstract Operation transformWithInsert(Operation op);
 
 
     /**
@@ -174,7 +173,7 @@ public abstract class Operation implements Serializable {
      *            Array in the format returned by getState
      * @throws OperationEngineException
      */
-    public void setState(Object[] properties) throws OperationEngineException {
+    private void setState(Object[] properties) throws OperationEngineException {
         if (!properties[0].equals(this.type)) {
             throw new OperationEngineException("setState invoked with state from wrong operation type.");
         } else if (this.immutable) {

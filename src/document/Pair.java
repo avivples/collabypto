@@ -10,7 +10,7 @@ public class Pair<X, Y> implements Serializable {
     private static final long serialVersionUID = -8784148340029363617L;
 
     // First object with type X
-    public X first;
+    public final X first;
     // second object with type Y
     public Y second;
 

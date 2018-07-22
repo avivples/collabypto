@@ -1,14 +1,13 @@
 package gui;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import javax.swing.*;
-
 import server_client.CollabClient;
 
-public class LoginPage extends JFrame{
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+class LoginPage extends JFrame{
 
     // Default local IP address
     private static final String LOCAL_IP = "127.0.0.1";
@@ -18,8 +17,8 @@ public class LoginPage extends JFrame{
     private int portNo;
 
     // Prompt to the user
-    private static final String PROMPT = "Please Enter user name, IP address"
-                                         + " and Port or Default for local connection";
+    private static final String PROMPT = "Please enter user name, IP address"
+                                         + " and port or Default for local connection";
     // Prompt for IP
     private static final String IP = "Server IP";
     // Prompt for Port
@@ -41,7 +40,7 @@ public class LoginPage extends JFrame{
     private CollabClient collabClient;
 
     // Notify user when they enter wrong port number
-    protected static final String WRONG_PORT_NUMBER = "Please enter correct port number (xx.xxx.xx.xx)";
+    private static final String WRONG_PORT_NUMBER = "Please enter correct port number (xx.xxx.xx.xx)";
     // Notify user when they enter wrong IP or port number
     private static final String WRONG_IP_OR_PORT = "Please correct your IP and Port number";
 
@@ -70,90 +69,57 @@ public class LoginPage extends JFrame{
         JButton defaultVal = new JButton(DEFAULT_BUTTON);
         JButton submit = new JButton(SUBMIT_BUTTON);
 
-        defaultVal.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent arg0) {
-                String userName = userNameInput.getText(); // get the Text from the user
-                if (userName.length() <= 0) {
-                    userName = JOptionPane.showInputDialog(frame, "Enter username:");
-                } else {
-                    userName = userNameInput.getText().trim();
-                }
-                if (userName == null || !userName.matches("[A-Za-z0-9]+") && userName.length() < 1) {
-                    frame.dispose();
-                    new ErrorDialog("Please enter an alphanumeric username");
-                    SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            LoginPage.this.initGui();
-                        }
-                    });
-                    return;
-                }
-
-                frame.dispose();
-                collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName);
-                Thread thread = new Thread(() -> collabClient.start());
-                thread.start();
+        defaultVal.addActionListener(arg0 -> {
+            String userName12 = userNameInput.getText(); // get the Text from the user
+            if (userName12.length() <= 0) {
+                userName12 = JOptionPane.showInputDialog(frame, "Enter username:");
+            } else {
+                userName12 = userNameInput.getText().trim();
             }
+            if (userName12 == null || !userName12.matches("[A-Za-z0-9]+") && userName12.length() < 1) {
+                frame.dispose();
+                new ErrorDialog("Please enter an alphanumeric username");
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        LoginPage.this.initGui();
+                    }
+                });
+                return;
+            }
+
+            frame.dispose();
+            collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName12);
+            Thread thread = new Thread(() -> collabClient.start());
+            thread.start();
         });
 
         // connect to remote server
-        submit.addActionListener(new ActionListener() {
-
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String userName = userNameInput.getText(); // get the Text from the user
+        submit.addActionListener(e -> {
+            String userName1 = userNameInput.getText(); // get the Text from the user
 //                if (userName.length() <= 0) {
 //                    userName = JOptionPane.showInputDialog(frame, "Enter username:");
 //                } else {
-                    userName = userNameInput.getText().trim();
+                userName1 = userNameInput.getText().trim();
 //                }
-                if (userName == null || !userName.matches("[A-Za-z0-9]+") && userName.length() < 1) {
-                    frame.dispose();
-                    new ErrorDialog("Please enter an alphanumeric username:");
-                    SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            LoginPage.this.initGui();
-                        }
-                    });
-                    return;
-                }
+            if (userName1 == null || !userName1.matches("[A-Za-z0-9]+") && userName1.length() < 1) {
+                frame.dispose();
+                new ErrorDialog("Please enter an alphanumeric username:");
+                SwingUtilities.invokeLater(LoginPage.this::initGui);
+                return;
+            }
 
-                String ip = ipInput.getText().trim();
-                String portInputString = portInput.getText().trim();
-                try {
-                    if (ip.length() > 0 && portInputString.length() > 0) {
-                        try {
-                            // take the port number input
-                            portNo = Integer.parseInt(portInputString);
+            String ip1 = ipInput.getText().trim();
+            String portInputString = portInput.getText().trim();
+            try {
+                if (ip1.length() > 0 && portInputString.length() > 0) {
+                    try {
+                        // take the port number input
+                        portNo = Integer.parseInt(portInputString);
 
-                        } catch (NumberFormatException exception) {
-                            frame.dispose();
-                            new ErrorDialog(WRONG_PORT_NUMBER);
-                            SwingUtilities.invokeLater(new Runnable() {
-                                @Override
-                                public void run() {
-                                    LoginPage.this.initGui();
-                                }
-                            });
-
-                        }
+                    } catch (NumberFormatException exception) {
                         frame.dispose();
-                        collabClient = new CollabClient(ip, portNo, userName);
-                        Thread thread = new Thread() {
-                            @Override
-                            public void run() {
-                                collabClient.start();
-                            }
-                        };
-                        thread.start();
-                    }
-                    else {
-                        frame.dispose();
-                        new ErrorDialog(WRONG_IP_OR_PORT);
+                        new ErrorDialog(WRONG_PORT_NUMBER);
                         SwingUtilities.invokeLater(new Runnable() {
                             @Override
                             public void run() {
@@ -162,16 +128,21 @@ public class LoginPage extends JFrame{
                         });
 
                     }
-                } catch (IllegalArgumentException exception) {
+                    frame.dispose();
+                    collabClient = new CollabClient(ip1, portNo, userName1);
+                    Thread thread = new Thread(() -> collabClient.start());
+                    thread.start();
+                }
+                else {
                     frame.dispose();
                     new ErrorDialog(WRONG_IP_OR_PORT);
-                    SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            LoginPage.this.initGui();
-                        }
-                    });
+                    SwingUtilities.invokeLater(() -> LoginPage.this.initGui());
+
                 }
+            } catch (IllegalArgumentException exception) {
+                frame.dispose();
+                new ErrorDialog(WRONG_IP_OR_PORT);
+                SwingUtilities.invokeLater(() -> LoginPage.this.initGui());
             }
         });
 
@@ -218,7 +189,7 @@ public class LoginPage extends JFrame{
     }
 
     public static void main(String[] args) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
-        UIManager.setLookAndFeel("javax.swing.plaf.nimbus.NimbusLookAndFeel");
+        UIManager.setLookAndFeel("com.jtattoo.plaf.hifi.HiFiLookAndFeel");
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {

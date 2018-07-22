@@ -1,23 +1,18 @@
 package server_client;
 
-import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-
-import javax.swing.JTextPane;
-import javax.swing.SwingUtilities;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.DefaultStyledDocument;
-import javax.swing.text.SimpleAttributeSet;
-
-import server_client.CollabInterface;
-
 import document.ClientState;
 import document.Operation;
 import document.OperationEngine;
 import document.OperationEngineException;
-
 import server_client.CollabClient.ENCRYPTION_METHOD;
+
+import javax.swing.*;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultStyledDocument;
+import javax.swing.text.SimpleAttributeSet;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * to Hold the main Document of the Collab edit, might implement on top of gap
@@ -36,7 +31,7 @@ public class CollabModel extends DefaultStyledDocument {
     /**
      * This is the document we are editing
      */
-    private JTextPane mainDocument;
+    private final JTextPane mainDocument;
 
     /**
      * This is the client's local operationEngine
@@ -71,7 +66,7 @@ public class CollabModel extends DefaultStyledDocument {
     /**
      * This is the unique clientID.
      */
-    private int siteID;
+    private final int siteID;
 
 
     /**
@@ -93,7 +88,6 @@ public class CollabModel extends DefaultStyledDocument {
     }
 
 
-    // TODO: WE ADDED THIS BACK BECAUSE IT WASN'T UPDATING THE INSERT, ONLY DELETE
     /**
      * This is called by the TextChangeListener to update the local
      * OperationEngine and the StringBuilder This function will also call the
@@ -117,7 +111,6 @@ public class CollabModel extends DefaultStyledDocument {
             try {
                 collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -145,7 +138,6 @@ public class CollabModel extends DefaultStyledDocument {
             try {
                 collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -174,7 +166,6 @@ public class CollabModel extends DefaultStyledDocument {
             try {
                 collab.transmit(top, ENCRYPTION_METHOD.SIGNAL);
             } catch (IOException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -191,48 +182,46 @@ public class CollabModel extends DefaultStyledDocument {
      * @throws BadLocationException     - thrown when an invalid insert occurs
      */
     public Operation remoteOp(Operation op, boolean insert)
-            throws OperationEngineException, BadLocationException {
+            throws OperationEngineException {
         if (op.getKey() == null) {
             return null;
         }
         if (op.getKey().equals(OPKEY)) {
             final Operation top = oe.pushRemoteOp(op);
             if (top == null) {
-                return top;
+                return null;
             }
 
             try {
-                SwingUtilities.invokeAndWait(new Runnable() {
-                    public void run() {
-                        mainDocument.setEditable(false);
-                        int offset = top.getOffset();
-                        String value = top.getValue();
+                SwingUtilities.invokeAndWait(() -> {
+                    mainDocument.setEditable(false);
+                    int offset = top.getOffset();
+                    String value = top.getValue();
 
-                        AttributeSet temp = new SimpleAttributeSet();
-                        if (mainDocument != null) {
-                            remote = true;
-                            try {
-                                // operation is an insert
-                                if (insert) {
-                                    mainDocument.getDocument().insertString(offset, value, temp);
-                                }
-                                // operation is a delete
-                                else {
-                                    mainDocument.getDocument().remove(offset, value.length());
-                                }
-                                // update the caret position
-                                int caretPos = mainDocument.getCaretPosition();
-                                if (offset < caretPos) {
-                                    int max = mainDocument.getDocument().getLength();
-                                    int newpos = Math.min(caretPos, max);
-                                    newpos = Math.max(0, newpos);
-                                    mainDocument.setCaretPosition(newpos);
-                                }
-                            } catch (BadLocationException e) {
-                                throw new RuntimeException(e);
+                    AttributeSet temp = new SimpleAttributeSet();
+                    if (mainDocument != null) {
+                        remote = true;
+                        try {
+                            // operation is an insert
+                            if (insert) {
+                                mainDocument.getDocument().insertString(offset, value, temp);
                             }
-                            mainDocument.setEditable(true);
+                            // operation is a delete
+                            else {
+                                mainDocument.getDocument().remove(offset, value.length());
+                            }
+                            // update the caret position
+                            int caretPos = mainDocument.getCaretPosition();
+                            if (offset < caretPos) {
+                                int max = mainDocument.getDocument().getLength();
+                                int newpos = Math.min(caretPos, max);
+                                newpos = Math.max(0, newpos);
+                                mainDocument.setCaretPosition(newpos);
+                            }
+                        } catch (BadLocationException e) {
+                            throw new RuntimeException(e);
                         }
+                        mainDocument.setEditable(true);
                     }
                 });
             } catch (InterruptedException e) {
