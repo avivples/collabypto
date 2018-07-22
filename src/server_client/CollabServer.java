@@ -234,12 +234,16 @@ public class CollabServer implements CollabInterface {
                 //client is new
                 for(String user : clientInfos.keySet()) {
                     if(user.equals(clientName)) {
-                        System.err.println(clientName + " already taken.");
-                        out.writeObject(clientName + " already taken. Please enter new username");
-                        return;
+                        if(!(p.second instanceof Boolean)) {
+                            System.err.println(clientName + " already taken.");
+                            out.writeObject(clientName + " is already taken. Please enter new username");
+                            return;
+                        }
+                        else {
+                            out.writeObject(true);
+                        }
                     }
                 }
-
                 if(clientInfo == null) {
 
                     //client sent indication that he is returning even though he is new
@@ -253,7 +257,7 @@ public class CollabServer implements CollabInterface {
 
                     Object token = in.readObject();
 
-                    if(!(token instanceof  String) || token == null) {
+                    if(!(token instanceof String) || token == null) {
                         System.err.println(clientName + " attempted to register without token");
                         out.writeObject("Missing token.");
                         return;
