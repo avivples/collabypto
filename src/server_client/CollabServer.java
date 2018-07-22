@@ -96,7 +96,7 @@ public class CollabServer implements CollabInterface {
 
 
     /**
-     * List of all users
+     * List of all online users
      */
     private ArrayList<String> usernames = new ArrayList<>();
 
@@ -109,9 +109,7 @@ public class CollabServer implements CollabInterface {
 
     // TODO: Put history and documentInstance for every doc. For only one for testing
     private HashMap<String, String[]> clientLists = new HashMap<>();
-    //private HashMap<String, ArrayList<Object>> histories = new HashMap<>();
     private HashMap<String, DocumentInstance> documentInstances = new HashMap<>();
-//    private int accept = 0;
 
     private HashMap<String, UserInfo> clientInfos = new HashMap<>();
     private ArrayList<String> tokens = new ArrayList<>();
@@ -232,19 +230,32 @@ public class CollabServer implements CollabInterface {
                 Pair p = (Pair) input;
                 clientName = (String) p.first;
                 clientInfo = clientInfos.get(clientName);
-                if(clientInfo == null) {
-                    //client is new
 
-                    //client sent indication that he is returning even though he is new
-                    if(p.second instanceof  Boolean) {
-                        System.err.println(clientName + " attempted to log in as returning user without info");
+                //client is new
+                for(String user : clientInfos.keySet()) {
+                    if(user.equals(clientName)) {
+                        System.err.println(clientName + " already taken.");
+                        out.writeObject(clientName + " already taken. Please enter new username");
                         return;
                     }
+                }
+
+                if(clientInfo == null) {
+
+                    //client sent indication that he is returning even though he is new
+                    if(p.second instanceof Boolean) {
+                        System.err.println(clientName + " attempted to log in as returning user without info");
+                        out.writeObject("Missing user information in server.");
+                        return;
+                    }
+
+                    out.writeObject(true);
 
                     Object token = in.readObject();
 
                     if(!(token instanceof  String) || token == null) {
                         System.err.println(clientName + " attempted to register without token");
+                        out.writeObject("Missing token.");
                         return;
                     }
                     else {
@@ -254,9 +265,11 @@ public class CollabServer implements CollabInterface {
                             clientInfos.put(clientName, clientInfo);
                             clientInfo.registrationInfo = (RegistrationInfo) p.second;
                             tokens.remove(token);
+                            out.writeObject(true);
                         }
                         else {
                             System.err.println(clientName + " attempted to register with invalid token");
+                            out.writeObject("Invalid token.");
                             return;
                         }
                     }

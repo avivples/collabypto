@@ -4,6 +4,7 @@ import com.thoughtworks.xstream.XStream;
 import com.thoughtworks.xstream.io.xml.DomDriver;
 import document.*;
 
+import gui.LoginPage;
 import org.whispersystems.libsignal.protocol.CiphertextMessage;
 import org.whispersystems.libsignal.protocol.PreKeySignalMessage;
 import org.whispersystems.libsignal.protocol.SignalMessage;
@@ -90,6 +91,9 @@ public class CollabClient implements CollabInterface {
 	protected String label = "Client";
 	/** Intializes socket and streams to null */
 	private Socket s = null;
+
+	/** Error message **/
+	private String errorMessage = "Server Disconnected.";
 
 	/** outputstream to send objects to server */
 	protected ObjectOutputStream out = null;
@@ -306,10 +310,6 @@ public class CollabClient implements CollabInterface {
 
 			//TODO: race condition when people are writing while you are leaving
 
-			// TODO: authentication
-            // TODO: if user is returning, then go to document selection page. Otherwise, make him enter token
-            // TODO: check if token value is correct - if not return to main page
-
 			boolean returning = readFromFile();
 
 			try {
@@ -322,13 +322,27 @@ public class CollabClient implements CollabInterface {
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
-			if (!returning) {
-				String tokenValue = JOptionPane.showInputDialog(null,"Please enter your token:", null);
-				transmit(tokenValue);
-			}
 
+            Object o = in.readObject();
+			// boolean --> username not in use
+            if(o instanceof Boolean) {
+                if (!returning) {
+                    String tokenValue = JOptionPane.showInputDialog(null, "Please enter your token:", null);
+                    transmit(tokenValue);
+                    o = in.readObject();
+                    if(o instanceof String) {
+                        errorMessage = (String) o;
+                    }
+                }
+            }
+            // string --> username in use or returning user with missing info in server
+            else {
+                errorMessage = (String) o;
+            }
 
-			Object o = in.readObject();
+			o = in.readObject();
+
+			// TODO: error message of wrong token or wrong username
 
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 				//doesnt work if process shuts down unexpectedly
@@ -362,15 +376,15 @@ public class CollabClient implements CollabInterface {
 			while (o != null) {
 			    parseInput(o);
 				o = in.readObject();
-			}
 
+			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (OperationEngineException e) {
 			e.printStackTrace();
 		} finally {
 		    // Close connection
-			JOptionPane.showMessageDialog(null,"Authentication failed", "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(null, errorMessage, "Error", JOptionPane.ERROR_MESSAGE);
 
 			s.close();
 			out.close();
@@ -402,7 +416,6 @@ public class CollabClient implements CollabInterface {
 				updateDoc(op);
 			} else if (plaintext instanceof ArrayList) {
 				// Updates list of current users and documents
-
 				ArrayList<String> users = (ArrayList<String>) plaintext;
 				ArrayList<String> documents = (ArrayList<String>) p.second;
 				this.gui.updateUsers(users.toArray());
@@ -479,13 +492,12 @@ public class CollabClient implements CollabInterface {
 		//The server is sending a list of sessioninfos.
 		else if (o instanceof ArrayList) {
 	        ArrayList lst = (ArrayList) o;
-				try {
-                    buildSessions(lst);
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+	        try {
+	            buildSessions((ArrayList<SessionInfo>) lst);
+	        }
+	        catch (Exception e) {
+	            e.printStackTrace(); }
+	    }
 		else {
             throw new RuntimeException("Unrecognized object type received by client");
         }

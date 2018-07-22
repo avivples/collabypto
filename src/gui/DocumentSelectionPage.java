@@ -163,6 +163,7 @@ public class DocumentSelectionPage extends JFrame {
             @Override
             public void actionPerformed(ActionEvent arg0) {
                 if (documentInput.getText().length() > 0) {
+
                     // TODO: need to check all the documents on the server - not just unique to the user
                     // TODO: check shouldn't be on the client side
                     // Check if document name already exists
