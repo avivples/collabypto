@@ -181,15 +181,15 @@ public class CollabModel extends DefaultStyledDocument {
      * @throws OperationEngineException
      * @throws BadLocationException     - thrown when an invalid insert occurs
      */
-    public Operation remoteOp(Operation op, boolean insert)
+    public void remoteOp(Operation op, boolean insert)
             throws OperationEngineException {
         if (op.getKey() == null) {
-            return null;
+            return;
         }
         if (op.getKey().equals(OPKEY)) {
             final Operation top = oe.pushRemoteOp(op);
             if (top == null) {
-                return null;
+                return;
             }
 
             try {
@@ -229,10 +229,8 @@ public class CollabModel extends DefaultStyledDocument {
             } catch (InvocationTargetException e) {
                 e.printStackTrace();
             }
-            return top;
         } else {
             // op's key does not equal the document key
-            return null;
         }
     }
 

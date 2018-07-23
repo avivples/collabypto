@@ -6,53 +6,27 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-
-
-/*
- * Testing Strategy:
- * See ClientGui
- * In addition to what currently tested in ClientGUI, the text documents of the server
- * is uneditable, everything else is identical to the strategy indicated in Client Gui
- * So we can tested by trying to edit the documents
- * 
- * This follows the MVC design pattern too*/
 
 /**
- * ServerGui inherit from Edit Gui, it includes some methods to get the
- * collabModel getSideID and setModelKey. Thread-safe argument This is
- * thread-safe for the same reason as Client GUI since it is run in the seperate
- * swing thread which won't interfere with the main thread. See Client GUI
- * thread-safe argument for more information
- * 
- * @author
- * 
+ * A GUI that the owner of the server can use to create tokens for the users.
+ * The tokens are stored in the server and are used by clients to enter the server.
  */
 
 class ServerGui extends JPanel {
 
 	private static final long serialVersionUID = -1426186299786063098L;
 	private final CollabServer collabServer;
-	/** The initial String to show in the Documents */
-	private static final String WELCOME_MESSAGE = "Welcome to Collab Edit";
-	/**
-	 * The name to show on top of the documents to see whose document belong to
-	 */
-	private static final String PROMPT_FOR_SERVER = "Server for document: ";
 
     public static void main(String[] args) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
         UIManager.setLookAndFeel("com.jtattoo.plaf.hifi.HiFiLookAndFeel");
 
-		CollabServer server = new CollabServer("0.0.0.0", 4444);
+		CollabServer server = new CollabServer(4444);
 	    ServerGui gui = new ServerGui(server);
         Thread thread = new Thread(() -> gui.collabServer.start());
         thread.start();
     }
 
-	/**
-	 * ServerGui sets up the GUI for the local client
-	 */
+
 	private ServerGui(CollabServer server) {
         collabServer = server;
         createGUI();
@@ -78,7 +52,7 @@ class ServerGui extends JPanel {
 		f.add(mainPanel);
 		f.pack();
 		f.setVisible(true);
-		JLabel copied = new JLabel("Token copied to clipboard! Send token to invite!");
+		JLabel copied = new JLabel("Token copied to clipboard. Send token to invite!");
 
 		button.addActionListener(e -> {
 			String token1 = collabServer.generateToken();
@@ -88,9 +62,6 @@ class ServerGui extends JPanel {
 			clipboard.setContents(stringSelection, null);
 			mainPanel.add(copied);
 			f.revalidate();
-			f.repaint();
-					});
+			f.repaint(); });
 	}
-
-
 }

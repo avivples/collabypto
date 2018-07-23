@@ -15,9 +15,9 @@ public class RegistrationInfo implements Serializable {
     private static final long serialVersionUID = 1337;
 
     private PreKeyBundle[] preKeyBundles;
-
     //for now we assume that prekeys dont run out. In the future it is possible to implement creation of new prekeys when the supply is running low.
-    //The following variable stores the
+
+    //stores index of earliest unused prekey
     private int index;
 
 
@@ -32,6 +32,8 @@ public class RegistrationInfo implements Serializable {
         index++;
         return new SessionInfo(preKey, senderID, documentID);
     }
+
+    //serialization methods
 
     private void writeObject(ObjectOutputStream out) throws IOException {
         Class<?>[] classes = new Class[] { PreKeyBundle.class, DjbECPublicKey.class};

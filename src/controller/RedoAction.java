@@ -26,7 +26,7 @@ public class RedoAction extends AbstractAction {
 		try {
 			this.manager.redo();
 		} catch (CannotRedoException e) {
-			new ErrorDialog("Nothing To Redo.");
+			new ErrorDialog("Nothing To redo.");
 		}
 
 	}

@@ -3,8 +3,6 @@ package gui;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
 import javax.swing.Action;
 import javax.swing.BorderFactory;
@@ -48,6 +46,7 @@ import java.io.PrintWriter;
  * This GUI is thread-safe because the OT algorithm is run separately on each client.
  *
  */
+@SuppressWarnings("Duplicates")
 public class ClientGui extends JPanel {
 
     private static final long serialVersionUID = -2826617458739559881L;
@@ -59,15 +58,7 @@ public class ClientGui extends JPanel {
 
     // Holds the document area
     private JTextPane textArea;
-    private JButton undoButton;
-    private JButton redoButton;
 
-    // Copy button
-    private JButton copyButton;
-    // Paste button
-    private JButton pasteButton;
-    // Cut Paste
-    private JButton cutButton;
     // Holds list of all users currently editing the document
     private JList userList;
     // List all the documents the user has access to
@@ -109,25 +100,28 @@ public class ClientGui extends JPanel {
 
         // copy button
         ImageIcon copy = new ImageIcon("raw/copy.png");
-        copyButton = new JButton(copy);
+        // Copy button
+        JButton copyButton = new JButton(copy);
         copyButton.setToolTipText("Copy Text");
         copyButton.addActionListener(e -> textArea.copy());
         // paste button
         ImageIcon paste = new ImageIcon("raw/paste.png");
-        pasteButton = new JButton(paste);
+        // Paste button
+        JButton pasteButton = new JButton(paste);
         pasteButton.setToolTipText("Paste Text");
         pasteButton.addActionListener(e -> textArea.paste());
         // cut button
         ImageIcon cut = new ImageIcon("raw/cut.png");
-        cutButton = new JButton(cut);
+        // Cut Paste
+        JButton cutButton = new JButton(cut);
         cutButton.setToolTipText("Cut Text");
         cutButton.addActionListener(e -> textArea.cut());
         // undo button
         ImageIcon undo = new ImageIcon("raw/undo.png");
-        undoButton = new JButton(undo);
+        JButton undoButton = new JButton(undo);
         // redo button
         ImageIcon redo = new ImageIcon("raw/redo.png");
-        redoButton = new JButton(redo);
+        JButton redoButton = new JButton(redo);
 
         JMenuBar toolBar = new JMenuBar();
 
@@ -170,7 +164,7 @@ public class ClientGui extends JPanel {
                 areaScrollPane.getBorder()));
 
         userList = createUserLogin(new String[] { "No users right now." });
-        JLabel userLabel = new JLabel("Who's Viewing");
+        JLabel userLabel = new JLabel("Who's online");
         JScrollPane userLoginScrollPane = new JScrollPane(userList);
         userLoginScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
         userLoginScrollPane.setPreferredSize(new Dimension(100, 145));

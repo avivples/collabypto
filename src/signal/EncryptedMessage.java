@@ -8,14 +8,13 @@ public class EncryptedMessage implements Serializable {
 
     public final String recipientID;
     public final String senderID;
-    private final String documentID;
     public final byte[] message;
     public int order;
 
     public EncryptedMessage(String recipientID, String senderID, String documentID, byte[] message) {
         this.recipientID = recipientID;
         this.senderID = senderID;
-        this.documentID = documentID;
+        String documentID1 = documentID;
         this.message = message;
     }
 

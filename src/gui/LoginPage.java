@@ -4,8 +4,7 @@ import server_client.CollabClient;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
 
 class LoginPage extends JFrame{
 
@@ -61,7 +60,7 @@ class LoginPage extends JFrame{
         JLabel ip = new JLabel(IP);
         ipInput = new JTextField();
 
-        ipInput.setToolTipText("Enter the ip address");
+        ipInput.setToolTipText("Enter the IP address");
 
         JLabel port = new JLabel(PORT);
         portInput = new JTextField();
@@ -69,39 +68,32 @@ class LoginPage extends JFrame{
         JButton defaultVal = new JButton(DEFAULT_BUTTON);
         JButton submit = new JButton(SUBMIT_BUTTON);
 
+        //button actions checking the information is valid and starting a collabclient if it is.
+
         defaultVal.addActionListener(arg0 -> {
-            String userName12 = userNameInput.getText(); // get the Text from the user
-            if (userName12.length() <= 0) {
-                userName12 = JOptionPane.showInputDialog(frame, "Enter username:");
+            String userNameInputText = userNameInput.getText(); //get the Text from the user
+            if (userNameInputText.length() <= 0) {
+                userNameInputText = JOptionPane.showInputDialog(frame, "Enter username:");
             } else {
-                userName12 = userNameInput.getText().trim();
+                userNameInputText = userNameInput.getText().trim();
             }
-            if (userName12 == null || !userName12.matches("[A-Za-z0-9]+") && userName12.length() < 1) {
+            if (userNameInputText == null || !userNameInputText.matches("[A-Za-z0-9]+") && userNameInputText.length() < 1) {
                 frame.dispose();
                 new ErrorDialog("Please enter an alphanumeric username");
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        LoginPage.this.initGui();
-                    }
-                });
+                SwingUtilities.invokeLater(() -> LoginPage.this.initGui());
                 return;
             }
 
             frame.dispose();
-            collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userName12);
+            collabClient = new CollabClient(LOCAL_IP, DEFAULT_PORT, userNameInputText);
             Thread thread = new Thread(() -> collabClient.start());
             thread.start();
         });
 
         // connect to remote server
         submit.addActionListener(e -> {
-            String userName1 = userNameInput.getText(); // get the Text from the user
-//                if (userName.length() <= 0) {
-//                    userName = JOptionPane.showInputDialog(frame, "Enter username:");
-//                } else {
-                userName1 = userNameInput.getText().trim();
-//                }
+            // get the Text from the user
+            String userName1 = userNameInput.getText().trim();
             if (userName1 == null || !userName1.matches("[A-Za-z0-9]+") && userName1.length() < 1) {
                 frame.dispose();
                 new ErrorDialog("Please enter an alphanumeric username:");
@@ -190,11 +182,6 @@ class LoginPage extends JFrame{
 
     public static void main(String[] args) throws ClassNotFoundException, UnsupportedLookAndFeelException, InstantiationException, IllegalAccessException {
         UIManager.setLookAndFeel("com.jtattoo.plaf.hifi.HiFiLookAndFeel");
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                JFrame frame = new LoginPage();
-            }
-        });
+        SwingUtilities.invokeLater(() -> new LoginPage());
     }
 }

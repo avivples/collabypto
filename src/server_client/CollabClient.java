@@ -23,7 +23,6 @@ import signal.RegistrationInfo;
 import signal.SessionInfo;
 
 import javax.swing.*;
-import javax.swing.text.BadLocationException;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -36,8 +35,7 @@ import java.util.Random;
 
 /**
  * This is the client that will connect to a server. A unique instance of the
- * client will be created each time a user opens up a client. It will receive a
- * copy of the central document from the server. Changes to the document on this
+ * client will be created each time a user opens up a client. Changes to the document on this
  * particular client will be sent to the server. Changes to the document by
  * other clients will be relayed by the server, and this client will apply an OT
  * algorithm to correctly update its own document. All of this will be reflected
@@ -45,8 +43,6 @@ import java.util.Random;
  *
  * Passing these tests ensure that our client is able to display the latest
  * version of the document while a user is adding new text.
- *
- * @author youyanggu
  */
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -67,21 +63,19 @@ public class CollabClient implements CollabInterface {
 	/** ip number of client */
 	private final String ip;
 
-	private final String serverName;
-
+    //the name of the directory the client will read/write information from/to.
 	private final String dir;
+
 	/** username of client */
 	private String name;
 
-	//the text of the document
+	//the text of the document and its context vector
 	private DocumentState documentState = new DocumentState("", null);
 
 	/** label to display at the top of the document GUI */
     private String label = "Client";
-	/** Intializes socket and streams to null */
-	private Socket s = null;
 
-	/** Error message **/
+    /** Error message **/
 	private String errorMessage = "Server Disconnected.";
 
 	/** outputstream to send objects to server */
@@ -91,8 +85,10 @@ public class CollabClient implements CollabInterface {
 	/** client GUI used to display the document */
     private ClientGui gui;
 
+    //The signal protocol information is stored here
 	private InMemorySignalProtocolStore clientStore;
 
+	//the type of encryption used (AES was included before but was deprecated)
 	public enum ENCRYPTION_METHOD {
 		NONE, SIGNAL
 	}
@@ -109,14 +105,14 @@ public class CollabClient implements CollabInterface {
 		this.ip = IP;
 		this.port = port;
 		this.name = name;
-		this.serverName = ip + "-" + port;
+        String serverName = ip + "-" + port;
 		this.dir =  "users/" + name + "/" + serverName;
 	}
 
 	/**
 	 * start up a client.
 	 * by calling the connect() method.
-	 * @throws OperationEngineException if the operation finds an incosistency
+	 * @throws OperationEngineException if the operation finds an inconsistency
 	 */
 	public void start() {
         try {
@@ -129,15 +125,17 @@ public class CollabClient implements CollabInterface {
 
     //Creates a list of bundles to pass to the server, so the server can create sessions with other users.
 	private RegistrationInfo register () throws InvalidKeyException {
+		//initialize information as per the signal library instructions
 		IdentityKeyPair	identityKeyPair = KeyHelper.generateIdentityKeyPair();
 		int registrationId  = KeyHelper.generateRegistrationId(true);
 		int startId = new Random().nextInt(Medium.MAX_VALUE);
 		List<PreKeyRecord> preKeys = KeyHelper.generatePreKeys(startId, 100);
-		SignedPreKeyRecord signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, 5); // why 5?
+		SignedPreKeyRecord signedPreKey = KeyHelper.generateSignedPreKey(identityKeyPair, new Random().nextInt(Medium.MAX_VALUE));
 
-		// Create a list of PreKeyBundle
+		//Create a list of PreKeyBundles
 		List<PreKeyBundle> preKeyBundles = createPreKeyBundles(identityKeyPair, registrationId, preKeys, signedPreKey);
-		// Store (in memory for now, later using local DB)
+
+		//Store in the data structure
 		clientStore = new InMemorySignalProtocolStore(identityKeyPair, registrationId);
 		for (PreKeyRecord pK : preKeys) {
 			clientStore.storePreKey(pK.getId(), pK);
@@ -147,7 +145,7 @@ public class CollabClient implements CollabInterface {
 		return new RegistrationInfo(preKeyBundles);
 	}
 
-	// write information on exit to load when client rejoins
+	//write information on exit to load when client rejoins
 	private void writeToFile() throws IOException, OperationEngineException {
 		Class<?>[] classes = new Class[] {HashMap.class, ClientSessionCipher.class};
 		XStream xs = new XStream(new DomDriver());
@@ -155,6 +153,7 @@ public class CollabClient implements CollabInterface {
 		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
 		xs.allowTypes(classes);
 
+		//write registration information
 		String fileName = dir + "/clientStore.txt";
 		File clientStoreFile = new File(fileName);
 		clientStoreFile.getParentFile().mkdirs();
@@ -162,16 +161,17 @@ public class CollabClient implements CollabInterface {
 		String xml = xs.toXML(clientStore);
 		writeXMLToFile(clientStoreFile, xml);
 
-
+		//if the user is in a document, then also write document information
 		if(!document.equals("")) {
+			//write document text and context vector
 			DocumentState documentState = new DocumentState(gui.getCollabModel().getDocumentText(), gui.getCollabModel().copyOfCV());
 			fileName = dir + "/doc-" + document + ".txt";
 			File documentStateFile = new File(fileName);
-            //noinspection ResultOfMethodCallIgnored
             documentStateFile.createNewFile();
             xml = xs.toXML(documentState);
 			writeXMLToFile(documentStateFile, xml);
 
+			//write session ciphers
 			fileName = dir + "/sessions-" + document + ".txt";
 			File sessionCiphersFile = new File(fileName);
 			sessionCiphersFile.createNewFile();
@@ -181,22 +181,25 @@ public class CollabClient implements CollabInterface {
 
 	}
 
+	//helper function for writing
 	private void writeXMLToFile(File file, String xml) throws IOException {
 		FileWriter writer = new FileWriter(file, false);
 		writer.write(xml);
 		writer.close();
 	}
 
-	//reads and sets clientstore and sessionciphers. Returns true if we had this information, false otherwise. There is currently no check to missing/faulty files/directories, but fake data would just cause you to crash rather than get access.
+	//reads and sets clientstore and sessionciphers. Returns true if the client has this information, false otherwise.
 	private boolean readFromFile() throws IOException {
 		XStream xs = new XStream(new DomDriver());
 		XStream.setupDefaultSecurity(xs);
 		xs.allowTypesByWildcard(new String[] {"org.whispersystems.libsignal.**"});
 
+		//if client has no directory for this server, we don't read.
 		if(!new File(dir).exists()) {
 			return false;
 		}
 
+		//read registration information.
 		String fileName = dir + "/clientStore.txt";
 		File clientStoreFile = new File(fileName);
 		String xml = readAllFile(clientStoreFile);
@@ -205,6 +208,7 @@ public class CollabClient implements CollabInterface {
 		return true;
 	}
 
+	//reads and sets document information upon client requesting a document.
 	public boolean readDocument() throws IOException {
 		Class<?>[] classes = new Class[] {DocumentState.class, HashMap.class, ClientSessionCipher.class};
 		XStream xs = new XStream(new DomDriver());
@@ -226,6 +230,7 @@ public class CollabClient implements CollabInterface {
 		return true;
 	}
 
+	//helper function for reading
 	private String readAllFile(File file) throws IOException {
 		FileInputStream fis = new FileInputStream(file);
 		byte[] data = new byte[(int) file.length()];
@@ -234,6 +239,7 @@ public class CollabClient implements CollabInterface {
 		return new String(data);
 	}
 
+	//creates a prekeybundle holding 1 prekey for each of the prekeys given.
 	private List<PreKeyBundle> createPreKeyBundles(IdentityKeyPair	identityKeyPair,
 												   int registrationId, List<PreKeyRecord> preKeys,
 												   SignedPreKeyRecord signedPreKey) {
@@ -241,7 +247,7 @@ public class CollabClient implements CollabInterface {
 		List<PreKeyBundle> preKeyBundles = new ArrayList<>();
 		for (PreKeyRecord pK : preKeys) {
 			PreKeyBundle preKeyBundle = new PreKeyBundle(registrationId, 1, pK.getId(),
-					pK.getKeyPair().getPublicKey(), 5, signedPreKey.getKeyPair().getPublicKey(),
+					pK.getKeyPair().getPublicKey(), signedPreKey.getId(), signedPreKey.getKeyPair().getPublicKey(),
 					signedPreKey.getSignature(), identityKeyPair.getPublicKey());
 			preKeyBundles.add(preKeyBundle);
 		}
@@ -250,7 +256,7 @@ public class CollabClient implements CollabInterface {
 
 
 	/**
-	 * Starts the client and try to connec to the server with the paramters
+	 * Starts the client and try to connect to the server with the parameters
 	 * given in the constructor. It success, it will continue a connection with
 	 * the server until an exception is thrown. A GUI is created that will
 	 * hopefully reflect the current state of the document. Various message
@@ -266,7 +272,9 @@ public class CollabClient implements CollabInterface {
 	    // Establishes a socket connection
 		System.out.println("Connecting to port: " + this.port + " at: " + this.ip);
 		InetSocketAddress address = new InetSocketAddress(this.ip, this.port);
-		try {
+        /* Intializes socket and streams to null */
+        Socket s;
+        try {
 		    s = new Socket();
 		    s.connect(address, TIMEOUT);
 		} catch (UnknownHostException e) {
@@ -285,8 +293,7 @@ public class CollabClient implements CollabInterface {
 			out = new ObjectOutputStream(s.getOutputStream());
 			in = new ObjectInputStream(s.getInputStream());
 
-			//TODO: race condition when people are writing while you are leaving
-
+			//determine if we have information for this server. Register if we don't, tell the server if we do.
 			boolean returning = readFromFile();
 
 			try {
@@ -307,6 +314,8 @@ public class CollabClient implements CollabInterface {
                     String tokenValue = JOptionPane.showInputDialog(null, "Please enter your token:", null);
                     transmit(tokenValue);
                     o = in.readObject();
+
+                    //if server sent an error message
                     if(o instanceof String) {
                         errorMessage = (String) o;
                     }
@@ -319,10 +328,9 @@ public class CollabClient implements CollabInterface {
 
 			o = in.readObject();
 
-			// TODO: error message of wrong token or wrong username
 
 			Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-				//doesnt work if process shuts down unexpectedly
+				//doesn't work if process shuts down unexpectedly
 				try {
 					writeToFile();
 				} catch (IOException e) {
@@ -364,7 +372,7 @@ public class CollabClient implements CollabInterface {
 			s.close();
 			out.close();
 			in.close();
-			System.exit(0);
+			System.exit(1);
 		}
 	}
 
@@ -439,7 +447,7 @@ public class CollabClient implements CollabInterface {
 				EncryptedMessage message = (EncryptedMessage) o;
 				Operation op = decrypt(message);
 				if (getID() == op.getSiteId()) {
-					System.out.println("site ID is the same " + getID());
+					System.err.println("site ID is the same " + getID());
 					return; //shouldn't happen when server sends to specific users
 				}
 				op.setOrder(message.order);
@@ -456,7 +464,7 @@ public class CollabClient implements CollabInterface {
             if (this.name.equals("Anonymous")) {
 				this.name += "" + this.siteID;
 			}
-			//TODO: we shouldn't be writing/reading the username twice but removing it seems to make the client/document list disappear. Fix
+			//TODO: we shouldn't be writing/reading the username twice but removing it seems to make the client/document list disappear.
             out.writeObject(this.name);
             out.flush();
             label = this.name + " is editing document: " + this.document;
@@ -478,22 +486,24 @@ public class CollabClient implements CollabInterface {
 	//builds sessions for the first time from a list given by the server
 	private void buildSessions(ArrayList<SessionInfo> sessions) throws UntrustedIdentityException, InvalidKeyException {
 		for(SessionInfo session : sessions) {
+			//build sessions only for this document
 			if(!session.documentID.equals(document)) continue;
+
+			//build session as per library instructions
 			SignalProtocolAddress address = new SignalProtocolAddress(session.senderID, 1);
-		//	clientStore.storeSession(address, new SessionRecord(new SessionState()));
-		//	clientStore.saveIdentity(address, session.preKey.getIdentityKey());
 			SessionBuilder sessionBuilder = new SessionBuilder(clientStore, address);
 			sessionBuilder.process(session.preKey);  //note: sessionbuilder automatically stores the session in clientstore
 			SessionCipher sessionCipher = new SessionCipher(clientStore, address);
+
+			//update our data structures to store the ciphers
 			if(sessionCiphers.get(document) == null)  {
 				sessionCiphers.put(document, new ArrayList<>());
 			}
-			//System.out.println("sender: " + session.senderID + " recipient: " + getUsername() +  " " + session.preKey.getPreKeyId());
 			sessionCiphers.get(document).add(new ClientSessionCipher(sessionCipher, session.senderID, document));
 		}
 	}
 
-
+    //encrypt a message pairwise and send to the server
 	private void encrypt(Object plaintext) throws IOException, UntrustedIdentityException {
 		Class<?>[] classes = new Class[] { Operation.class};
 		XStream xs = new XStream(new DomDriver());
@@ -521,6 +531,7 @@ public class CollabClient implements CollabInterface {
 		out.flush();
 	}
 
+	//decrypt a received message
 	private Operation decrypt(EncryptedMessage signalMessage) throws DuplicateMessageException, InvalidMessageException, UntrustedIdentityException, LegacyMessageException, InvalidVersionException, InvalidKeyException, InvalidKeyIdException {
 		Class<?>[] classes = new Class[] {InsertOperation.class, DeleteOperation.class,  Operation.class};
 		XStream xs = new XStream(new DomDriver());
@@ -539,8 +550,8 @@ public class CollabClient implements CollabInterface {
 
 		//deserialize the byte array to get the signalmessage
 		//decrypt the signal message to get the byte array of the message
+
 		byte[] plaintext;
-		//TODO: change to flag (prekeysignalmessage is sent when you have yet to receive a message, signalmessage is sent afterwards)
 		try {
 			plaintext = clientSessionCipher.sessionCipher.decrypt(new SignalMessage(signalMessage.message));
 		}
@@ -548,12 +559,11 @@ public class CollabClient implements CollabInterface {
 			plaintext = clientSessionCipher.sessionCipher.decrypt(new PreKeySignalMessage(signalMessage.message));
 		}
 
-
 		//convert the bytes to the xml message that the sent operation was converted to
 		String xml = new String(plaintext);
-		//convert the xml message to the operation that was sent
 
-		return(Operation) xs.fromXML(xml);
+		//convert the xml message to the operation that was sent
+		return (Operation) xs.fromXML(xml);
 	}
 	/**
 	 * Updates the client's copy of the document using operational transform
@@ -584,6 +594,7 @@ public class CollabClient implements CollabInterface {
 		int i = 0;
 		for(EncryptedMessage message : history) {
 			try {
+				//do not use the last operation - we need it to update the context vector
 				if(i != operations.length - 1) operations[i] = decrypt(message);
 				i++;
 			}
@@ -598,9 +609,9 @@ public class CollabClient implements CollabInterface {
 					op.setOrder(i);
 				if (op.getKey().equals(document)) {
 					if (op instanceof InsertOperation) {
-						//if(doc.length() < op.getOffset()) doc.append(op.getValue());
 						doc.insert(op.getOffset(), op.getValue());
-					} else if (op instanceof DeleteOperation) {
+					}
+					else if (op instanceof DeleteOperation) {
 						doc.delete(op.getOffset(), op.getOffset() + op.getValue().length());
 					}
 				}
@@ -650,7 +661,7 @@ public class CollabClient implements CollabInterface {
 		}
 	}
 
-
+	//update list of available documents
 	public Object[] readNewDocumentsList() throws IOException, ClassNotFoundException {
 		Object o = in.readObject();
 		if(o == null) {
@@ -671,7 +682,8 @@ public class CollabClient implements CollabInterface {
 		this.document = text;
 	}
 
-	public ArrayList<String> getUserList() throws IOException, ClassNotFoundException {
+	//get list of registered users
+	public ArrayList<String> getRegisteredUserList() throws IOException, ClassNotFoundException {
 		Object input = in.readObject();
 		if(!(input instanceof  ArrayList)) {
 			throw new IOException("Expected arraylist of registered users");
@@ -683,5 +695,4 @@ public class CollabClient implements CollabInterface {
 	public String getUsername() {
 	    return this.name;
 	}
-
 }

@@ -10,6 +10,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
+//A session info is to registration info what a list of prekeybundles is to a prekeybundle.
+//It is the same as registration info but containing only one bundle.
+
 public class SessionInfo implements Serializable {
     private static final long serialVersionUID = 1338;
 
@@ -20,12 +23,11 @@ public class SessionInfo implements Serializable {
 
     public SessionInfo(PreKeyBundle preKey, String senderID, String documentID) {
         this.preKey = preKey;
-
         this.senderID = senderID;
         this.documentID = documentID;
-
     }
 
+    //serialization methods
 
     private void writeObject(ObjectOutputStream out) throws IOException {
         Class<?>[] classes = new Class[] { PreKeyBundle.class, DjbECPublicKey.class};

@@ -1,6 +1,5 @@
 package gui;
 
-import document.OperationEngineException;
 import document.Pair;
 import org.apache.commons.lang3.RandomStringUtils;
 import server_client.CollabClient;
@@ -12,7 +11,6 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyEvent;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,14 +26,18 @@ public class DocumentSelectionPage extends JFrame {
 	private static final String SELECT_BUTTON = "Select Document";
 	private static final String REFRESH_BUTTON = "Refresh List";
 	private static final String NEW_DOCUMENT = "New Document";
-    private static final String GENERATE_TOKENS = "Generate Tokens";
+    private static final String GENERATE_TOKENS = "Invite Users";
 
 
-    // Holds the list of documents to display
+    //Holds the list of documents to display
 	private final JList listOfDocument;
+
 	private final DefaultListModel listDocumentModel;
-	// Holds name of created document
+
+	//Holds name of created document
 	private final JTextArea documentInput;
+
+	//Reference to the client in this GUI
 	private final CollabClient client;
 
 
@@ -51,29 +53,13 @@ public class DocumentSelectionPage extends JFrame {
 	public DocumentSelectionPage(ArrayList<String> documents, final CollabClient client) {
 	    this.client = client;
 		Collections.sort(documents);
+
+		//create the GUI
 		JPanel mainPanel = new JPanel();
 		Border border = BorderFactory.createTitledBorder("Welcome " + client.getUsername() + "!");
 		mainPanel.setBorder(border);
 		mainPanel.grabFocus();
-		//creates an action that refreshes the document list, and binds it to F5.
-		Action updateDocuments = new AbstractAction("updateDocuments") {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				try {
-					//asks the server for the list of documents.
-					client.transmit("refresh");
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-				try {
-					updateDocumentsList(client.readNewDocumentsList());
-				} catch (IOException | ClassNotFoundException e1) {
-					e1.printStackTrace();
-				}
-			}
-		};
-		mainPanel.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
-		mainPanel.getActionMap().put("updateDocuments", updateDocuments);
+
 		setContentPane(mainPanel);
 		JPanel leftPane = new JPanel(new BorderLayout());
 		leftPane.requestFocusInWindow();
@@ -90,14 +76,14 @@ public class DocumentSelectionPage extends JFrame {
 		Border border2 = BorderFactory.createLineBorder(Color.BLACK);
 		documentScrollPane.setBorder(BorderFactory.createCompoundBorder(border2,
 				BorderFactory.createEmptyBorder()));
-		documentScrollPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "updateDocuments");
-		documentScrollPane.getActionMap().put("updateDocuments", updateDocuments);
 		documentScrollPane.requestFocusInWindow();
 		documentScrollPane.setPreferredSize(new Dimension(250, 145));
 		documentScrollPane.setMinimumSize(new Dimension(10, 10));
 		documentScrollPane.setAutoscrolls(true);
 
 		JButton selectButton = new JButton(SELECT_BUTTON);
+		//create an action that sends the server the document the client want to edit
+        // along with a boolean indicating if it's the client's first time entering this document
 		selectButton.addActionListener(e -> {
             int index = listOfDocument.getSelectedIndex();
             if (index != -1) {
@@ -139,7 +125,7 @@ public class DocumentSelectionPage extends JFrame {
 
 		JPanel rightPane = new JPanel(new BorderLayout());
 		rightPane.requestFocusInWindow();
-		JLabel label2 = new JLabel("Create A New Document");
+		JLabel label2 = new JLabel("Create New Document");
 		documentInput = new JTextArea();
 		documentInput.setBorder(BorderFactory.createCompoundBorder(border2,
 				BorderFactory.createEmptyBorder()));
@@ -147,12 +133,12 @@ public class DocumentSelectionPage extends JFrame {
 		documentInput.setMinimumSize(new Dimension(10, 10));
 
 		JButton newDocumentButton = new JButton(NEW_DOCUMENT);
+
+		//create action for creating a new document
         newDocumentButton.addActionListener(arg0 -> {
             if (documentInput.getText().length() > 0) {
-
-                // TODO: need to check all the documents on the server - not just unique to the user
-                // TODO: check shouldn't be on the client side
-                // Check if document name already exists
+                // Check if document name already exists (already created by this client)
+                //TODO: make check serverside
                 ListModel model = listOfDocument.getModel();
                 for(int i = 0; i < model.getSize(); i++) {
                     String doc = (String) model.getElementAt(i);
@@ -166,7 +152,7 @@ public class DocumentSelectionPage extends JFrame {
                 ArrayList<String> userList = new ArrayList<>();
                 try {
                     client.transmit(userList);
-                    userList = client.getUserList();
+                    userList = client.getRegisteredUserList();
                     userList.remove(client.getUsername());
                 }
                 catch (IOException e) {
@@ -174,6 +160,9 @@ public class DocumentSelectionPage extends JFrame {
                 } catch (ClassNotFoundException e) {
                     e.printStackTrace();
                 }
+
+                //create a new window where the client sees the list of registered users and can add/remove them.
+
                 JFrame f = new JFrame("Invite Users");
                 JPanel leftPanel = new JPanel();
                 leftPanel.setLayout(new BorderLayout());
@@ -207,25 +196,18 @@ public class DocumentSelectionPage extends JFrame {
                 JButton add = new JButton("Add");
                 JButton remove = new JButton("Remove");
 
-                add.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        int index = availList.getSelectedIndex();
-                        String name = availList.getSelectedValue();
-                        availModel.remove(index);
-                        selectedModel.addElement(name);
-                    }
+                add.addActionListener(e -> {
+                    int index = availList.getSelectedIndex();
+                    String name = availList.getSelectedValue();
+                    availModel.remove(index);
+                    selectedModel.addElement(name);
                 });
 
-                remove.addActionListener(new ActionListener() {
-                    @Override
-                    public void actionPerformed(ActionEvent e) {
-                        int index = selectedList.getSelectedIndex();
-                        String name = selectedList.getSelectedValue();
-                        selectedModel.remove(index);
-                        availModel.addElement(name);
-//                            sortListModel(availModel);
-                    }
+                remove.addActionListener(e -> {
+                    int index = selectedList.getSelectedIndex();
+                    String name = selectedList.getSelectedValue();
+                    selectedModel.remove(index);
+                    availModel.addElement(name);
                 });
 
                 JPanel subPanel1 = new JPanel();
@@ -256,7 +238,7 @@ public class DocumentSelectionPage extends JFrame {
                         client.setDocument(documentInput.getText());
 
                         try {
-                            //give the document name and client list to the server.
+                            //give the document name (and a boolean indicating you never entered it) and client list to the server.
                             client.transmit(new Pair(documentInput.getText(), false));
                             client.transmit(clientNames);
                         }
@@ -279,7 +261,6 @@ public class DocumentSelectionPage extends JFrame {
             else {
                 new ErrorDialog("Please enter the name of the document");
             }
-
         });
 
         JButton generateTokenButton = new JButton(GENERATE_TOKENS);
@@ -311,6 +292,7 @@ public class DocumentSelectionPage extends JFrame {
 		this.revalidate();
 	}
 
+	//create the token generation GUI. It's similar to the server but with user-friendly terminology.
     private void generateTokenGUI() {
         JFrame f = new JFrame("Create Invite");
         JPanel mainPanel = new JPanel();
@@ -319,38 +301,35 @@ public class DocumentSelectionPage extends JFrame {
         mainPanel.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createTitledBorder(""),
                 BorderFactory.createEmptyBorder(10, 10, 10, 10)));
-        JLabel token = new JLabel("Token:");
+        JLabel token = new JLabel("Code:");
         JTextField text = new JTextField(10);
         text.setPreferredSize(new Dimension(200,30));
         text.setEditable(false);
-        JButton button = new JButton("Create Invitation");
+        JButton button = new JButton("Create Invitation Code");
         mainPanel.add(token, BorderLayout.PAGE_START);
         mainPanel.add(text, BorderLayout.CENTER);
         mainPanel.add(button, BorderLayout.PAGE_END);
         f.add(mainPanel);
         f.pack();
         f.setVisible(true);
-        JLabel copied = new JLabel("Token copied to clipboard! Send token to invite!");
+        JLabel copied = new JLabel("Invitation code copied to clipboard. Send it to who you want to invite!");
 
         button.addActionListener(e -> {
-            String token1 = generateToken();
+            String tokenStr = RandomStringUtils.randomAlphanumeric(10);
             try {
-                client.transmit(token1);
+                //no need to check with the server if it exists - see comment in collabserver
+                client.transmit(tokenStr);
             } catch (IOException e1) {
                 e1.printStackTrace();
             }
-            text.setText(token1);
-            StringSelection stringSelection = new StringSelection(token1);
+            text.setText(tokenStr);
+            StringSelection stringSelection = new StringSelection(tokenStr);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             clipboard.setContents(stringSelection, null);
             mainPanel.add(copied);
             f.revalidate();
             f.repaint();
         });
-    }
-
-    private String generateToken() {
-        return RandomStringUtils.randomAlphanumeric(10);
     }
 
     private void sortListModel(DefaultListModel<String> listModel) {

@@ -26,7 +26,7 @@ public class UnDoAction extends AbstractAction {
 		try {
 			this.manager.undo();
 		} catch (CannotUndoException e) {
-			new ErrorDialog("Nothing to Undo");
+			new ErrorDialog("Nothing to undo");
 		}
 	}
 
