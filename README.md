@@ -1,5 +1,5 @@
 # collabypto
-Collabypto is a real-time collaborative text editor with end-to-end encryption utilizing Operational Transformation and the Signal Protocol.
+Collabypto is a real-time collaborative text editor with end-to-end encryption using Operational Transformation and the Signal Protocol.
 
 
 # Installation instructions:
