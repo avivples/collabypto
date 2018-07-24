@@ -13,5 +13,5 @@ This project is based on the following open source collaborative editing program
 * https://github.com/nhvtgd/Real-Time-Collaborative-Editing/tree/master/hanwenxu-viettran-yygu
 * https://github.com/signalapp/libsignal-protocol-java
 
-The following classes from the source project were modified: CollabClient, CollabServer, CollabModel, LoginPage, DocumentSelectionPage, ClientGui, ServerGui 
+The following classes from the source project were modified: CollabClient, CollabServer, CollabModel, LoginPage, DocumentSelectionPage, ClientGui, ServerGui   
 The following classes were added: The 'signal' folder, DocumentInstance, DocumentState, UserInfo
