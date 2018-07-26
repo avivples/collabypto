@@ -389,13 +389,7 @@ public class CollabClient implements CollabInterface {
 	    	Pair p = (Pair) o;
 	    	Object plaintext = p.first;
 			// We'll change the temp in the if to the decrypted variable
-			if (plaintext instanceof Operation) {
-				Operation op = (Operation) plaintext;
-				if (getID() == op.getSiteId()) return;
-				// We received an operation from the server. Update the local document
-				op.setOrder((Integer) p.second);
-				updateDoc(op);
-			} else if (plaintext instanceof ArrayList) {
+			if (plaintext instanceof ArrayList) {
 				// Updates list of current users and documents
 				ArrayList<String> users = (ArrayList<String>) plaintext;
 				ArrayList<String> documents = (ArrayList<String>) p.second;
@@ -516,54 +510,58 @@ public class CollabClient implements CollabInterface {
 		EncryptedMessage[] messages = new EncryptedMessage[sessionCiphers.get(document).size()];
 		for(ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
 			clientSessionCipher = sessionCipher;
+			//turn it into a string so we can send it easily
 			String xml = xs.toXML(plaintext);
 
 			//encrypt the string with the sessioncipher
 			CiphertextMessage message = clientSessionCipher.sessionCipher.encrypt(xml.getBytes("UTF-8"));
 
 			//create an encrypted message out of the data
-			messages[i] = new EncryptedMessage(clientSessionCipher.senderID, getUsername(), clientSessionCipher.documentID, message.serialize());
+			messages[i] = new EncryptedMessage(clientSessionCipher.senderID, getUsername(), message.serialize());
 			i++;
 		}
-		//turn it into a string so we can send it easily
-
 		out.writeObject(messages);
 		out.flush();
 	}
 
 	//decrypt a received message
-	private Operation decrypt(EncryptedMessage signalMessage) throws DuplicateMessageException, InvalidMessageException, UntrustedIdentityException, LegacyMessageException, InvalidVersionException, InvalidKeyException, InvalidKeyIdException {
-		Class<?>[] classes = new Class[] {InsertOperation.class, DeleteOperation.class,  Operation.class};
-		XStream xs = new XStream(new DomDriver());
-		XStream.setupDefaultSecurity(xs);
-		xs.allowTypes(classes);
-
-		//get the encrypted message
-
-		//get the appropriate sessioncipher to decrypt this message
-		ClientSessionCipher clientSessionCipher = null;
-		for(ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
-			if(sessionCipher.senderID.equals(signalMessage.senderID)) {
-				clientSessionCipher = sessionCipher;
-			}
-		}
-
-		//deserialize the byte array to get the signalmessage
-		//decrypt the signal message to get the byte array of the message
-
-		byte[] plaintext;
+	private Operation decrypt(EncryptedMessage signalMessage){
 		try {
-			plaintext = clientSessionCipher.sessionCipher.decrypt(new SignalMessage(signalMessage.message));
-		}
-		catch(Exception e) {
-			plaintext = clientSessionCipher.sessionCipher.decrypt(new PreKeySignalMessage(signalMessage.message));
-		}
+			Class<?>[] classes = new Class[]{InsertOperation.class, DeleteOperation.class, Operation.class};
+			XStream xs = new XStream(new DomDriver());
+			XStream.setupDefaultSecurity(xs);
+			xs.allowTypes(classes);
 
-		//convert the bytes to the xml message that the sent operation was converted to
-		String xml = new String(plaintext);
+			//get the encrypted message
 
-		//convert the xml message to the operation that was sent
-		return (Operation) xs.fromXML(xml);
+			//get the appropriate sessioncipher to decrypt this message
+			ClientSessionCipher clientSessionCipher = null;
+			for (ClientSessionCipher sessionCipher : sessionCiphers.get(document)) {
+				if (sessionCipher.senderID.equals(signalMessage.senderID)) {
+					clientSessionCipher = sessionCipher;
+				}
+			}
+
+			//deserialize the byte array to get the signalmessage
+			//decrypt the signal message to get the byte array of the message
+
+			byte[] plaintext;
+			try {
+				plaintext = clientSessionCipher.sessionCipher.decrypt(new SignalMessage(signalMessage.message));
+			} catch (Exception e) {
+				plaintext = clientSessionCipher.sessionCipher.decrypt(new PreKeySignalMessage(signalMessage.message));
+			}
+
+			//convert the bytes to the xml message that the sent operation was converted to
+			String xml = new String(plaintext);
+
+			//convert the xml message to the operation that was sent
+			return (Operation) xs.fromXML(xml);
+		}
+		catch (Exception e) {
+			System.err.println(e.getMessage());
+			return null;
+		}
 	}
 	/**
 	 * Updates the client's copy of the document using operational transform
